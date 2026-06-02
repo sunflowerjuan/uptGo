@@ -1,0 +1,30 @@
+{
+  "devDependencies": {
+    "concurrently": "^10.0.3",
+    "husky": "^9.1.7"
+  },
+  "name": "uptgo",
+  "version": "1.0.0",
+  "description": "Ecosistema Académico Integral para Estudiantes Universitarios",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd backend && npm run start:dev",
+    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sunflowerjuan/uptGo.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/sunflowerjuan/uptGo/issues"
+  },
+  "homepage": "https://github.com/sunflowerjuan/uptGo#readme"
+}
