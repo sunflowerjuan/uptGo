@@ -1,0 +1,856 @@
+// @ds-adherence-ignore -- omelette starter scaffold (raw elements/hex/px by design)
+import React from 'react'
+/* BEGIN USAGE */
+// tweaks-panel.jsx
+// Reusable Tweaks shell + form-control helpers.
+// Exports (to window): useTweaks, TweaksPanel, TweakSection, TweakRow, TweakSlider,
+//   TweakToggle, TweakRadio, TweakSelect, TweakText, TweakNumber, TweakColor, TweakButton.
+//
+// Owns the host protocol (listens for __activate_edit_mode / __deactivate_edit_mode,
+// posts __edit_mode_available / __edit_mode_set_keys / __edit_mode_dismissed) so
+// individual prototypes don't re-roll it. Ships a consistent set of controls so you
+// don't hand-draw <input type="range">, segmented radios, steppers, etc.
+//
+// Usage (in an HTML file that loads React + Babel):
+//
+//   const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+//     "primaryColor": "#D97757",
+//     "palette": ["#D97757", "#29261b", "#f6f4ef"],
+//     "fontSize": 16,
+//     "density": "regular",
+//     "dark": false
+//   }/*EDITMODE-END*/;
+//
+//   function App() {
+//     const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+//     return (
+//       <div style={{ fontSize: t.fontSize, color: t.primaryColor }}>
+//         Hello
+//         <TweaksPanel>
+//           <TweakSection label="Typography" />
+//           <TweakSlider label="Font size" value={t.fontSize} min={10} max={32} unit="px"
+//                        onChange={(v) => setTweak('fontSize', v)} />
+//           <TweakRadio  label="Density" value={t.density}
+//                        options={['compact', 'regular', 'comfy']}
+//                        onChange={(v) => setTweak('density', v)} />
+//           <TweakSection label="Theme" />
+//           <TweakColor  label="Primary" value={t.primaryColor}
+//                        options={['#D97757', '#2A6FDB', '#1F8A5B', '#7A5AE0']}
+//                        onChange={(v) => setTweak('primaryColor', v)} />
+//           <TweakColor  label="Palette" value={t.palette}
+//                        options={[['#D97757', '#29261b', '#f6f4ef'],
+//                                  ['#475569', '#0f172a', '#f1f5f9']]}
+//                        onChange={(v) => setTweak('palette', v)} />
+//           <TweakToggle label="Dark mode" value={t.dark}
+//                        onChange={(v) => setTweak('dark', v)} />
+//         </TweaksPanel>
+//       </div>
+//     );
+//   }
+//
+// TweakRadio is the segmented control for 2–3 short options (auto-falls-back to
+// TweakSelect past ~16/~10 chars per label); reach for TweakSelect directly when
+// options are many or long. For color tweaks always curate 3-4 options rather than
+// a free picker; an option can also be a whole 2–5 color palette (the stored value
+// is the array). The Tweak* controls are a floor, not a ceiling — build custom
+// controls inside the panel if a tweak calls for UI they don't cover.
+/* END USAGE */
+// ─────────────────────────────────────────────────────────────────────────────
+
+const __TWEAKS_STYLE = `
+  .twk-panel{position:fixed;right:16px;bottom:16px;z-index:2147483646;width:280px;
+    max-height:calc(100vh - 32px);display:flex;flex-direction:column;
+    transform:scale(var(--dc-inv-zoom,1));transform-origin:bottom right;
+    background:rgba(250,249,247,.78);color:#29261b;
+    -webkit-backdrop-filter:blur(24px) saturate(160%);backdrop-filter:blur(24px) saturate(160%);
+    border:.5px solid rgba(255,255,255,.6);border-radius:14px;
+    box-shadow:0 1px 0 rgba(255,255,255,.5) inset,0 12px 40px rgba(0,0,0,.18);
+    font:11.5px/1.4 ui-sans-serif,system-ui,-apple-system,sans-serif;overflow:hidden}
+  .twk-hd{display:flex;align-items:center;justify-content:space-between;
+    padding:10px 8px 10px 14px;cursor:move;user-select:none}
+  .twk-hd b{font-size:12px;font-weight:600;letter-spacing:.01em}
+  .twk-x{appearance:none;border:0;background:transparent;color:rgba(41,38,27,.55);
+    width:22px;height:22px;border-radius:6px;cursor:default;font-size:13px;line-height:1}
+  .twk-x:hover{background:rgba(0,0,0,.06);color:#29261b}
+  .twk-body{padding:2px 14px 14px;display:flex;flex-direction:column;gap:10px;
+    overflow-y:auto;overflow-x:hidden;min-height:0;
+    scrollbar-width:thin;scrollbar-color:rgba(0,0,0,.15) transparent}
+  .twk-body::-webkit-scrollbar{width:8px}
+  .twk-body::-webkit-scrollbar-track{background:transparent;margin:2px}
+  .twk-body::-webkit-scrollbar-thumb{background:rgba(0,0,0,.15);border-radius:4px;
+    border:2px solid transparent;background-clip:content-box}
+  .twk-body::-webkit-scrollbar-thumb:hover{background:rgba(0,0,0,.25);
+    border:2px solid transparent;background-clip:content-box}
+  .twk-row{display:flex;flex-direction:column;gap:5px}
+  .twk-row-h{flex-direction:row;align-items:center;justify-content:space-between;gap:10px}
+  .twk-lbl{display:flex;justify-content:space-between;align-items:baseline;
+    color:rgba(41,38,27,.72)}
+  .twk-lbl>span:first-child{font-weight:500}
+  .twk-val{color:rgba(41,38,27,.5);font-variant-numeric:tabular-nums}
+
+  .twk-sect{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+    color:rgba(41,38,27,.45);padding:10px 0 0}
+  .twk-sect:first-child{padding-top:0}
+
+  .twk-field{appearance:none;box-sizing:border-box;width:100%;min-width:0;height:26px;padding:0 8px;
+    border:.5px solid rgba(0,0,0,.1);border-radius:7px;
+    background:rgba(255,255,255,.6);color:inherit;font:inherit;outline:none}
+  .twk-field:focus{border-color:rgba(0,0,0,.25);background:rgba(255,255,255,.85)}
+  select.twk-field{padding-right:22px;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='rgba(0,0,0,.5)' d='M0 0h10L5 6z'/></svg>");
+    background-repeat:no-repeat;background-position:right 8px center}
+
+  .twk-slider{appearance:none;-webkit-appearance:none;width:100%;height:4px;margin:6px 0;
+    border-radius:999px;background:rgba(0,0,0,.12);outline:none}
+  .twk-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
+    width:14px;height:14px;border-radius:50%;background:#fff;
+    border:.5px solid rgba(0,0,0,.12);box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:default}
+  .twk-slider::-moz-range-thumb{width:14px;height:14px;border-radius:50%;
+    background:#fff;border:.5px solid rgba(0,0,0,.12);box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:default}
+
+  .twk-seg{position:relative;display:flex;padding:2px;border-radius:8px;
+    background:rgba(0,0,0,.06);user-select:none}
+  .twk-seg-thumb{position:absolute;top:2px;bottom:2px;border-radius:6px;
+    background:rgba(255,255,255,.9);box-shadow:0 1px 2px rgba(0,0,0,.12);
+    transition:left .15s cubic-bezier(.3,.7,.4,1),width .15s}
+  .twk-seg.dragging .twk-seg-thumb{transition:none}
+  .twk-seg button{appearance:none;position:relative;z-index:1;flex:1;border:0;
+    background:transparent;color:inherit;font:inherit;font-weight:500;min-height:22px;
+    border-radius:6px;cursor:default;padding:4px 6px;line-height:1.2;
+    overflow-wrap:anywhere}
+
+  .twk-toggle{position:relative;width:32px;height:18px;border:0;border-radius:999px;
+    background:rgba(0,0,0,.15);transition:background .15s;cursor:default;padding:0}
+  .twk-toggle[data-on="1"]{background:#34c759}
+  .twk-toggle i{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;
+    background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .15s}
+  .twk-toggle[data-on="1"] i{transform:translateX(14px)}
+
+  .twk-num{display:flex;align-items:center;box-sizing:border-box;min-width:0;height:26px;padding:0 0 0 8px;
+    border:.5px solid rgba(0,0,0,.1);border-radius:7px;background:rgba(255,255,255,.6)}
+  .twk-num-lbl{font-weight:500;color:rgba(41,38,27,.6);cursor:ew-resize;
+    user-select:none;padding-right:8px}
+  .twk-num input{flex:1;min-width:0;height:100%;border:0;background:transparent;
+    font:inherit;font-variant-numeric:tabular-nums;text-align:right;padding:0 8px 0 0;
+    outline:none;color:inherit;-moz-appearance:textfield}
+  .twk-num input::-webkit-inner-spin-button,.twk-num input::-webkit-outer-spin-button{
+    -webkit-appearance:none;margin:0}
+  .twk-num-unit{padding-right:8px;color:rgba(41,38,27,.45)}
+
+  .twk-btn{appearance:none;height:26px;padding:0 12px;border:0;border-radius:7px;
+    background:rgba(0,0,0,.78);color:#fff;font:inherit;font-weight:500;cursor:default}
+  .twk-btn:hover{background:rgba(0,0,0,.88)}
+  .twk-btn.secondary{background:rgba(0,0,0,.06);color:inherit}
+  .twk-btn.secondary:hover{background:rgba(0,0,0,.1)}
+
+  .twk-swatch{appearance:none;-webkit-appearance:none;width:56px;height:22px;
+    border:.5px solid rgba(0,0,0,.1);border-radius:6px;padding:0;cursor:default;
+    background:transparent;flex-shrink:0}
+  .twk-swatch::-webkit-color-swatch-wrapper{padding:0}
+  .twk-swatch::-webkit-color-swatch{border:0;border-radius:5.5px}
+  .twk-swatch::-moz-color-swatch{border:0;border-radius:5.5px}
+
+  .twk-chips{display:flex;gap:6px}
+  .twk-chip{position:relative;appearance:none;flex:1;min-width:0;height:46px;
+    padding:0;border:0;border-radius:6px;overflow:hidden;cursor:default;
+    box-shadow:0 0 0 .5px rgba(0,0,0,.12),0 1px 2px rgba(0,0,0,.06);
+    transition:transform .12s cubic-bezier(.3,.7,.4,1),box-shadow .12s}
+  .twk-chip:hover{transform:translateY(-1px);
+    box-shadow:0 0 0 .5px rgba(0,0,0,.18),0 4px 10px rgba(0,0,0,.12)}
+  .twk-chip[data-on="1"]{box-shadow:0 0 0 1.5px rgba(0,0,0,.85),
+    0 2px 6px rgba(0,0,0,.15)}
+  .twk-chip>span{position:absolute;top:0;bottom:0;right:0;width:34%;
+    display:flex;flex-direction:column;box-shadow:-1px 0 0 rgba(0,0,0,.1)}
+  .twk-chip>span>i{flex:1;box-shadow:0 -1px 0 rgba(0,0,0,.1)}
+  .twk-chip>span>i:first-child{box-shadow:none}
+  .twk-chip svg{position:absolute;top:6px;left:6px;width:13px;height:13px;
+    filter:drop-shadow(0 1px 1px rgba(0,0,0,.3))}
+`;
+type TweakPrimitive = string | number | boolean
+
+type TweakOption =
+  | TweakPrimitive
+  | {
+    label: string
+    value: TweakPrimitive
+  }
+
+type NormalizedTweakOption = {
+  label: string
+  value: TweakPrimitive
+}
+
+type TweakColorValue = string | string[]
+
+type TweakSetter<T extends Record<string, any>> = {
+  (key: keyof T, value: T[keyof T]): void
+  (edits: Partial<T>): void
+}
+
+type TweaksPanelProps = {
+  title?: string
+  children?: React.ReactNode
+}
+
+type TweakSectionProps = {
+  label: string
+  children?: React.ReactNode
+}
+
+type TweakRowProps = {
+  label: string
+  value?: string | number | null
+  children?: React.ReactNode
+  inline?: boolean
+}
+
+type TweakSliderProps = {
+  label: string
+  value: number
+  min?: number
+  max?: number
+  step?: number
+  unit?: string
+  onChange: (value: number) => void
+}
+
+type TweakToggleProps = {
+  label: string
+  value: boolean
+  onChange: (value: boolean) => void
+}
+
+type TweakRadioProps = {
+  label: string
+  value: string | number | boolean
+  options: TweakOption[]
+  onChange: (value: any) => void
+}
+
+type TweakSelectProps = {
+  label: string
+  value: string | number | boolean
+  options: TweakOption[]
+  onChange: (value: any) => void
+}
+
+type TweakTextProps = {
+  label: string
+  value: string
+  placeholder?: string
+  onChange: (value: string) => void
+}
+
+type TweakNumberProps = {
+  label: string
+  value: number
+  min?: number
+  max?: number
+  step?: number
+  unit?: string
+  onChange: (value: number) => void
+}
+
+type TweakColorProps = {
+  label: string
+  value: TweakColorValue
+  options?: TweakColorValue[]
+  onChange: (value: TweakColorValue) => void
+}
+
+type TweakButtonProps = {
+  label: string
+  onClick: () => void
+  secondary?: boolean
+}
+
+export function useTweaks<T extends Record<string, any>>(
+  defaults: T,
+): [T, TweakSetter<T>] {
+  const [values, setValues] = React.useState<T>(defaults)
+
+  const setTweak = React.useCallback((keyOrEdits: keyof T | Partial<T>, val?: T[keyof T]) => {
+    const edits =
+      typeof keyOrEdits === 'object' && keyOrEdits !== null
+        ? keyOrEdits
+        : ({ [keyOrEdits]: val } as Partial<T>)
+
+    setValues((prev) => ({ ...prev, ...edits }))
+
+    window.parent.postMessage({ type: '__edit_mode_set_keys', edits }, '*')
+    window.dispatchEvent(new CustomEvent('tweakchange', { detail: edits }))
+  }, []) as TweakSetter<T>
+
+  return [values, setTweak]
+}
+
+export function TweaksPanel({ title = 'Tweaks', children }: TweaksPanelProps) {
+  const [open, setOpen] = React.useState(false)
+  const dragRef = React.useRef<HTMLDivElement | null>(null)
+  const offsetRef = React.useRef({ x: 16, y: 16 })
+  const PAD = 16
+
+  const clampToViewport = React.useCallback(() => {
+    const panel = dragRef.current
+
+    if (!panel) return
+
+    const width = panel.offsetWidth
+    const height = panel.offsetHeight
+    const maxRight = Math.max(PAD, window.innerWidth - width - PAD)
+    const maxBottom = Math.max(PAD, window.innerHeight - height - PAD)
+
+    offsetRef.current = {
+      x: Math.min(maxRight, Math.max(PAD, offsetRef.current.x)),
+      y: Math.min(maxBottom, Math.max(PAD, offsetRef.current.y)),
+    }
+
+    panel.style.right = `${offsetRef.current.x}px`
+    panel.style.bottom = `${offsetRef.current.y}px`
+  }, [])
+
+  React.useEffect(() => {
+    if (!open) return
+
+    clampToViewport()
+
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', clampToViewport)
+      return () => window.removeEventListener('resize', clampToViewport)
+    }
+
+    const resizeObserver = new ResizeObserver(clampToViewport)
+    resizeObserver.observe(document.documentElement)
+
+    return () => resizeObserver.disconnect()
+  }, [open, clampToViewport])
+
+  React.useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      const type = event.data?.type
+
+      if (type === '__activate_edit_mode') {
+        setOpen(true)
+      }
+
+      if (type === '__deactivate_edit_mode') {
+        setOpen(false)
+      }
+    }
+
+    window.addEventListener('message', onMessage)
+    window.parent.postMessage({ type: '__edit_mode_available' }, '*')
+
+    return () => window.removeEventListener('message', onMessage)
+  }, [])
+
+  const dismiss = () => {
+    setOpen(false)
+    window.parent.postMessage({ type: '__edit_mode_dismissed' }, '*')
+  }
+
+  const onDragStart = (event: React.MouseEvent<HTMLDivElement>) => {
+    const panel = dragRef.current
+
+    if (!panel) return
+
+    const rect = panel.getBoundingClientRect()
+    const startX = event.clientX
+    const startY = event.clientY
+    const startRight = window.innerWidth - rect.right
+    const startBottom = window.innerHeight - rect.bottom
+
+    const move = (moveEvent: MouseEvent) => {
+      offsetRef.current = {
+        x: startRight - (moveEvent.clientX - startX),
+        y: startBottom - (moveEvent.clientY - startY),
+      }
+
+      clampToViewport()
+    }
+
+    const up = () => {
+      window.removeEventListener('mousemove', move)
+      window.removeEventListener('mouseup', up)
+    }
+
+    window.addEventListener('mousemove', move)
+    window.addEventListener('mouseup', up)
+  }
+
+  if (!open) return null
+
+  return (
+    <>
+      <style>{__TWEAKS_STYLE}</style>
+
+      <div
+        ref={dragRef}
+        className="twk-panel"
+        data-omelette-chrome=""
+        style={{
+          right: offsetRef.current.x,
+          bottom: offsetRef.current.y,
+        }}
+      >
+        <div className="twk-hd" onMouseDown={onDragStart}>
+          <b>{title}</b>
+
+          <button
+            className="twk-x"
+            aria-label="Close tweaks"
+            onMouseDown={(event) => event.stopPropagation()}
+            onClick={dismiss}
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="twk-body">{children}</div>
+      </div>
+    </>
+  )
+}
+
+export function TweakSection({ label, children }: TweakSectionProps) {
+  return (
+    <>
+      <div className="twk-sect">{label}</div>
+      {children}
+    </>
+  )
+}
+
+export function TweakRow({
+  label,
+  value,
+  children,
+  inline = false,
+}: TweakRowProps) {
+  return (
+    <div className={inline ? 'twk-row twk-row-h' : 'twk-row'}>
+      <div className="twk-lbl">
+        <span>{label}</span>
+        {value != null && <span className="twk-val">{value}</span>}
+      </div>
+
+      {children}
+    </div>
+  )
+}
+
+export function TweakSlider({
+  label,
+  value,
+  min = 0,
+  max = 100,
+  step = 1,
+  unit = '',
+  onChange,
+}: TweakSliderProps) {
+  return (
+    <TweakRow label={label} value={`${value}${unit}`}>
+      <input
+        type="range"
+        className="twk-slider"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+      />
+    </TweakRow>
+  )
+}
+
+export function TweakToggle({ label, value, onChange }: TweakToggleProps) {
+  return (
+    <div className="twk-row twk-row-h">
+      <div className="twk-lbl">
+        <span>{label}</span>
+      </div>
+
+      <button
+        type="button"
+        className="twk-toggle"
+        data-on={value ? '1' : '0'}
+        role="switch"
+        aria-checked={value}
+        onClick={() => onChange(!value)}
+      >
+        <i />
+      </button>
+    </div>
+  )
+}
+
+export function TweakRadio({
+  label,
+  value,
+  options,
+  onChange,
+}: TweakRadioProps) {
+  const trackRef = React.useRef<HTMLDivElement | null>(null)
+  const [dragging, setDragging] = React.useState(false)
+  const valueRef = React.useRef(value)
+
+  valueRef.current = value
+
+  const labelLen = (option: TweakOption): number => {
+    if (typeof option === 'object') {
+      return String(option.label).length
+    }
+
+    return String(option).length
+  }
+
+  const maxLen = options.reduce<number>((maxValue, option) => {
+    return Math.max(maxValue, labelLen(option))
+  }, 0)
+
+  const limitByLength: Record<number, number> = {
+    2: 16,
+    3: 10,
+  }
+
+  const fitsAsSegments = maxLen <= (limitByLength[options.length] ?? 0)
+
+  if (!fitsAsSegments) {
+    const resolve = (selectedValue: string): TweakPrimitive => {
+      const match = options.find((option) => {
+        const optionValue = typeof option === 'object' ? option.value : option
+        return String(optionValue) === selectedValue
+      })
+
+      if (match === undefined) return selectedValue
+
+      return typeof match === 'object' ? match.value : match
+    }
+    return (
+      <TweakSelect
+        label={label}
+        value={value}
+        options={options}
+        onChange={(selectedValue) => onChange(resolve(String(selectedValue)))}
+      />
+    )
+  }
+
+  const opts: NormalizedTweakOption[] = options.map((option) => {
+    if (typeof option === 'object') {
+      return {
+        value: option.value,
+        label: String(option.label),
+      }
+    }
+
+    return {
+      value: option,
+      label: String(option),
+    }
+  })
+
+  const idx = Math.max(
+    0,
+    opts.findIndex((option) => option.value === value),
+  )
+
+  const n = opts.length
+
+  const segAt = (clientX: number) => {
+    const rect = trackRef.current?.getBoundingClientRect()
+
+    if (!rect) return opts[0].value
+
+    const inner = rect.width - 4
+    const index = Math.floor(((clientX - rect.left - 2) / inner) * n)
+
+    return opts[Math.max(0, Math.min(n - 1, index))].value
+  }
+
+  const onPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    setDragging(true)
+
+    const initialValue = segAt(event.clientX)
+
+    if (initialValue !== valueRef.current) {
+      onChange(initialValue)
+    }
+
+    const move = (moveEvent: PointerEvent) => {
+      if (!trackRef.current) return
+
+      const nextValue = segAt(moveEvent.clientX)
+
+      if (nextValue !== valueRef.current) {
+        onChange(nextValue)
+      }
+    }
+
+    const up = () => {
+      setDragging(false)
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+    }
+
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+  }
+
+  return (
+    <TweakRow label={label}>
+      <div
+        ref={trackRef}
+        role="radiogroup"
+        onPointerDown={onPointerDown}
+        className={dragging ? 'twk-seg dragging' : 'twk-seg'}
+      >
+        <div
+          className="twk-seg-thumb"
+          style={{
+            left: `calc(2px + ${idx} * (100% - 4px) / ${n})`,
+            width: `calc((100% - 4px) / ${n})`,
+          }}
+        />
+
+        {opts.map((option) => (
+          <button
+            key={String(option.value)}
+            type="button"
+            role="radio"
+            aria-checked={option.value === value}
+          >
+            {String(option.label)}
+          </button>
+        ))}
+      </div>
+    </TweakRow>
+  )
+}
+
+export function TweakSelect({
+  label,
+  value,
+  options,
+  onChange,
+}: TweakSelectProps) {
+  return (
+    <TweakRow label={label}>
+      <select
+        className="twk-field"
+        value={String(value)}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        {options.map((option) => {
+          const valueOption: TweakPrimitive =
+            typeof option === 'object' ? option.value : option
+
+          const labelOption: string =
+            typeof option === 'object' ? String(option.label) : String(option)
+
+          return (
+            <option key={String(valueOption)} value={String(valueOption)}>
+              {labelOption}
+            </option>
+          )
+        })}
+      </select>
+    </TweakRow>
+  )
+}
+
+export function TweakText({
+  label,
+  value,
+  placeholder,
+  onChange,
+}: TweakTextProps) {
+  return (
+    <TweakRow label={label}>
+      <input
+        className="twk-field"
+        type="text"
+        value={value}
+        placeholder={placeholder}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </TweakRow>
+  )
+}
+
+export function TweakNumber({
+  label,
+  value,
+  min,
+  max,
+  step = 1,
+  unit = '',
+  onChange,
+}: TweakNumberProps) {
+  const clamp = (num: number) => {
+    if (min != null && num < min) return min
+    if (max != null && num > max) return max
+
+    return num
+  }
+
+  const startRef = React.useRef({ x: 0, val: 0 })
+
+  const onScrubStart = (event: React.PointerEvent<HTMLSpanElement>) => {
+    event.preventDefault()
+
+    startRef.current = {
+      x: event.clientX,
+      val: value,
+    }
+
+    const decimals = (String(step).split('.')[1] || '').length
+
+    const move = (moveEvent: PointerEvent) => {
+      const dx = moveEvent.clientX - startRef.current.x
+      const raw = startRef.current.val + dx * step
+      const snapped = Math.round(raw / step) * step
+
+      onChange(clamp(Number(snapped.toFixed(decimals))))
+    }
+
+    const up = () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+    }
+
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+  }
+
+  return (
+    <div className="twk-num">
+      <span className="twk-num-lbl" onPointerDown={onScrubStart}>
+        {label}
+      </span>
+
+      <input
+        type="number"
+        value={value}
+        min={min}
+        max={max}
+        step={step}
+        onChange={(event) => onChange(clamp(Number(event.target.value)))}
+      />
+
+      {unit && <span className="twk-num-unit">{unit}</span>}
+    </div>
+  )
+}
+
+export function __twkIsLight(hex: string) {
+  const h = String(hex).replace('#', '')
+  const x = h.length === 3 ? h.replace(/./g, (char) => char + char) : h.padEnd(6, '0')
+  const n = parseInt(x.slice(0, 6), 16)
+
+  if (Number.isNaN(n)) return true
+
+  const r = (n >> 16) & 255
+  const g = (n >> 8) & 255
+  const b = n & 255
+
+  return r * 299 + g * 587 + b * 114 > 148000
+}
+
+function TwkCheck({ light }: { light: boolean }) {
+  return (
+    <svg viewBox="0 0 14 14" aria-hidden="true">
+      <path
+        d="M3 7.2 5.8 10 11 4.2"
+        fill="none"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        stroke={light ? 'rgba(0,0,0,.78)' : '#fff'}
+      />
+    </svg>
+  )
+}
+
+export function TweakColor({
+  label,
+  value,
+  options,
+  onChange,
+}: TweakColorProps) {
+  if (!options || !options.length) {
+    return (
+      <div className="twk-row twk-row-h">
+        <div className="twk-lbl">
+          <span>{label}</span>
+        </div>
+
+        <input
+          type="color"
+          className="twk-swatch"
+          value={String(value)}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      </div>
+    )
+  }
+
+  const key = (option: TweakColorValue) =>
+    String(JSON.stringify(option)).toLowerCase()
+
+  const cur = key(value)
+
+  return (
+    <TweakRow label={label}>
+      <div className="twk-chips" role="radiogroup">
+        {options.map((option, index) => {
+          const colors = Array.isArray(option) ? option : [option]
+          const [hero, ...rest] = colors
+          const sup = rest.slice(0, 4)
+          const on = key(option) === cur
+
+          return (
+            <button
+              key={index}
+              type="button"
+              className="twk-chip"
+              role="radio"
+              aria-checked={on}
+              data-on={on ? '1' : '0'}
+              aria-label={colors.join(', ')}
+              title={colors.join(' · ')}
+              style={{ background: hero }}
+              onClick={() => onChange(option)}
+            >
+              {sup.length > 0 && (
+                <span>
+                  {sup.map((color, colorIndex) => (
+                    <i key={colorIndex} style={{ background: color }} />
+                  ))}
+                </span>
+              )}
+
+              {on && <TwkCheck light={__twkIsLight(hero)} />}
+            </button>
+          )
+        })}
+      </div>
+    </TweakRow>
+  )
+}
+
+export function TweakButton({
+  label,
+  onClick,
+  secondary = false,
+}: TweakButtonProps) {
+  return (
+    <button
+      type="button"
+      className={secondary ? 'twk-btn secondary' : 'twk-btn'}
+      onClick={onClick}
+    >
+      {label}
+    </button>
+  )
+}
