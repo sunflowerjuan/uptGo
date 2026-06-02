@@ -55,17 +55,45 @@ const ICON_PATHS = {
   helpCircle: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 4.9.7c0 1.7-2.5 2.5-2.5 2.5"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
   award: '<circle cx="12" cy="8" r="6"/><path d="M8.2 13 7 22l5-3 5 3-1.2-9"/>',
   layers: '<polygon points="12 2 22 8.5 12 15 2 8.5 12 2"/><polyline points="2 15.5 12 22 22 15.5"/>',
-};
+} as const
 
-function Icon({ name, size = 18, stroke = 1.8, color = 'currentColor', style, className }) {
-  const path = ICON_PATHS[name];
-  if (!path) return null;
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
-         stroke={color} strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round"
-         className={className} style={{ display: 'block', flexShrink: 0, ...style }}
-         dangerouslySetInnerHTML={{ __html: path }} aria-hidden="true" />
-  );
+export type IconName = keyof typeof ICON_PATHS
+
+type IconProps = {
+  name: IconName | string
+  size?: number
+  stroke?: number
+  color?: string
+  style?: React.CSSProperties
+  className?: string
 }
 
-Object.assign(window, { Icon, ICON_PATHS });
+export function Icon({
+  name,
+  size = 18,
+  stroke = 1.8,
+  color = 'currentColor',
+  style,
+  className,
+}: IconProps) {
+  const path = ICON_PATHS[name as IconName]
+
+  if (!path) return null
+
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={stroke}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      style={{ display: 'block', flexShrink: 0, ...style }}
+      dangerouslySetInnerHTML={{ __html: path }}
+      aria-hidden="true"
+    />
+  )
+}
