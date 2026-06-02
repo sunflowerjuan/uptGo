@@ -12,7 +12,7 @@ import {
   cVar,
   subjectById,
 } from '../components/UI'
-
+import { Icon } from '../components/Icons'
 type AnyProps = Record<string, any>
 
 const DOW = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
@@ -46,6 +46,7 @@ const DAY_MARKS: Record<number, number[]> = {
 export function Calendar({ m, onAdd }: AnyProps) {
   const [view, setView] = React.useState<'mes' | 'agenda'>('mes')
   const [sel, setSel] = React.useState(8)
+  const [popupDay, setPopupDay] = React.useState<number | null>(null)
 
   const year = 2026
   const month = 4
@@ -85,6 +86,9 @@ export function Calendar({ m, onAdd }: AnyProps) {
     }
 
     return items
+  }
+  const monthPreview = (day: number) => {
+    return agendaDay(day).slice(0, m ? 1 : 2)
   }
 
   return (
@@ -160,47 +164,88 @@ export function Calendar({ m, onAdd }: AnyProps) {
                     key={index}
                     onClick={() => {
                       setSel(day)
-                      if (m) setView('agenda')
+
+                      if (agendaDay(day).length > 0) {
+                        setPopupDay(day)
+                      } else {
+                        setPopupDay(null)
+                      }
                     }}
                     style={{
                       aspectRatio: '1',
-                      minHeight: m ? 40 : 56,
+                      minHeight: m ? 40 : 72,
                       borderRadius: 'var(--r-sm)',
                       cursor: 'pointer',
-                      border: '1px solid ' + (selected ? 'var(--primary)' : 'transparent'),
-                      background: today ? 'var(--primary)' : selected ? 'var(--primary-soft)' : 'transparent',
+                      border: '1px solid ' + (selected ? 'var(--primary)' : today ? 'var(--primary-soft)' : 'transparent'),
+                      background: selected ? 'var(--primary-soft)' : today ? 'color-mix(in oklch, var(--primary) 10%, var(--surface))' : 'transparent',
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
-                      justifyContent: m ? 'center' : 'flex-start',
-                      padding: m ? 0 : '7px 0',
-                      gap: 4,
+                      justifyContent: 'flex-start',
+                      padding: m ? '6px 0' : '7px 0',
+                      gap: 2,
+                      overflow: 'hidden',
                       transition: 'background .15s',
                     }}
                   >
-                    <span style={{
-                      fontSize: m ? 13 : 13.5,
-                      fontWeight: today ? 700 : 500,
-                      color: today ? 'var(--on-primary)' : selected ? 'var(--primary-text)' : 'var(--text)',
-                      fontFamily: 'var(--font-display)',
-                    }}>
-                      {day}
-                    </span>
-
-                    {marks.length > 0 && (
-                      <span style={{ display: 'flex', gap: 2 }}>
-                        {marks.slice(0, 4).map((color, key) => (
-                          <span
-                            key={key}
-                            style={{
-                              width: m ? 4 : 5,
-                              height: m ? 4 : 5,
-                              borderRadius: '50%',
-                              background: today ? 'var(--on-primary)' : cVar(color),
-                            }}
-                          />
-                        ))}
+                    <div
+                      style={{
+                        width: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: m ? 'center' : 'space-between',
+                        padding: m ? 0 : '0 7px',
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: m ? 13 : 13.5,
+                          fontWeight: today ? 700 : 500,
+                          color: selected || today ? 'var(--primary-text)' : 'var(--text)', fontFamily: 'var(--font-display)',
+                        }}
+                      >
+                        {day}
                       </span>
+                    </div>
+
+                    {monthPreview(day).length > 0 && (
+                      <div
+                        style={{
+                          width: '100%',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 3,
+                          padding: m ? '0 4px' : '0 7px',
+                          marginTop: m ? 3 : 5,
+                          overflow: 'hidden',
+                        }}
+                      >
+                        {monthPreview(day).map((item: any, itemIndex: number) => (
+                          <span
+                            key={itemIndex}
+                            style={{
+                              width: '100%',
+                              minHeight: m ? 5 : 14,
+                              borderRadius: 6,
+                              background: cSoftVar(item.color),
+                              color: cVar(item.color),
+                              borderLeft: m ? 'none' : `2px solid ${cVar(item.color)}`,
+                              display: 'flex',
+                              alignItems: 'center',
+                              padding: m ? 0 : '0 5px',
+                              fontSize: 9.5,
+                              fontWeight: 600,
+                              lineHeight: 1,
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              opacity: selected ? 1 : 0.86,
+                            }}
+                          >
+                            {!m && `${item.time} ${item.title}`}
+                          </span>
+                        ))}
+                      </div>
                     )}
                   </button>
                 )
@@ -209,43 +254,150 @@ export function Calendar({ m, onAdd }: AnyProps) {
           </Card>
         </FadeIn>
       )}
+      {popupDay && agendaDay(popupDay).length > 0 && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 90,
+            background: 'oklch(0 0 0 / 0.18)',
+            display: 'flex',
+            alignItems: m ? 'flex-end' : 'center',
+            justifyContent: 'center',
+            padding: m ? '0 14px 18px' : 20,
+          }}
+          onClick={() => setPopupDay(null)}
+        >
+          <div
+            onClick={(event) => event.stopPropagation()}
+            style={{
+              width: m ? '100%' : 380,
+              maxWidth: '100%',
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--r-lg)',
+              boxShadow: 'var(--shadow-pop)',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                padding: '15px 16px',
+                borderBottom: '1px solid var(--border)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 10,
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    fontSize: 15,
+                    fontWeight: 600,
+                    color: 'var(--text)',
+                    fontFamily: 'var(--font-display)',
+                  }}
+                >
+                  {popupDay === 8 ? 'Hoy · ' : ''}
+                  {popupDay} de {MONTHS[month]}
+                </div>
 
-      <FadeIn delay={view === 'mes' ? 160 : 110}>
-        <Card pad={m ? 16 : 20}>
-          <SectionTitle>{sel === 8 ? 'Hoy · ' : ''}{sel} de {MONTHS[month]}</SectionTitle>
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: 'var(--text-3)',
+                    marginTop: 2,
+                  }}
+                >
+                  {agendaDay(popupDay).length} actividad{agendaDay(popupDay).length === 1 ? '' : 'es'}
+                </div>
+              </div>
 
-          {agendaDay(sel).length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              {agendaDay(sel).map((item: any, index: number, arr: any[]) => (
+              <button
+                onClick={() => setPopupDay(null)}
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 'var(--r-full)',
+                  border: '1px solid var(--border)',
+                  background: 'var(--surface)',
+                  color: 'var(--text-2)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Icon name="x" size={15} />
+              </button>
+            </div>
+
+            <div style={{ padding: '6px 16px 12px' }}>
+              {agendaDay(popupDay).map((item: any, index: number, arr: any[]) => (
                 <div
                   key={index}
                   style={{
                     display: 'flex',
-                    gap: 13,
-                    padding: '11px 0',
+                    gap: 12,
+                    padding: '12px 0',
                     borderBottom: index === arr.length - 1 ? 'none' : '1px solid var(--border)',
                   }}
                 >
-                  <div style={{ minWidth: 46, fontSize: 12.5, color: 'var(--text-2)', fontWeight: 600, fontFamily: 'var(--font-display)', paddingTop: 1 }}>
+                  <div
+                    style={{
+                      minWidth: 45,
+                      fontSize: 12,
+                      color: 'var(--text-2)',
+                      fontWeight: 600,
+                      fontFamily: 'var(--font-display)',
+                      paddingTop: 1,
+                    }}
+                  >
                     {item.time}
                   </div>
 
-                  <div style={{ width: 3, borderRadius: 3, background: cVar(item.color), flexShrink: 0 }} />
+                  <div
+                    style={{
+                      width: 3,
+                      borderRadius: 3,
+                      background: cVar(item.color),
+                      flexShrink: 0,
+                    }}
+                  />
 
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13.5, color: 'var(--text)', fontWeight: 500 }}>{item.title}</div>
-                    <div style={{ fontSize: 11.5, color: 'var(--text-3)', marginTop: 2 }}>{item.sub}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontSize: 13.5,
+                        color: 'var(--text)',
+                        fontWeight: 600,
+                      }}
+                    >
+                      {item.title}
+                    </div>
+
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: 'var(--text-3)',
+                        marginTop: 2,
+                      }}
+                    >
+                      {item.sub}
+                    </div>
                   </div>
 
-                  <Pill color="var(--text-2)" bg="var(--surface-2)">{item.type}</Pill>
+                  <Pill color="var(--text-2)" bg="var(--surface-2)">
+                    {item.type}
+                  </Pill>
                 </div>
               ))}
             </div>
-          ) : (
-            <EmptyState icon="calendar" title="Día libre" body="No hay actividades programadas." />
-          )}
-        </Card>
-      </FadeIn>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }
@@ -257,6 +409,7 @@ export function Schedule({ m, onAdd, toast }: AnyProps) {
   const headH = 36
   const [dayIdx, setDayIdx] = React.useState(0)
   const shownDays = m ? [dayIdx] : [0, 1, 2, 3, 4]
+
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>

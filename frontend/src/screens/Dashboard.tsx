@@ -6,7 +6,6 @@ import {
   FadeIn,
   Pill,
   PRIORITY,
-  ProgressBar,
   SectionTitle,
   cSoftVar,
   cVar,
@@ -109,6 +108,166 @@ function HeroFocus({ m, onOpenTask, go }: AnyProps) {
   )
 }
 
+function MiniMapCard({ onClick }: AnyProps) {
+  const blocks = [
+    { x: 10, y: 18, w: 22, h: 18 },
+    { x: 46, y: 12, w: 30, h: 20 },
+    { x: 14, y: 56, w: 24, h: 22 },
+    { x: 58, y: 54, w: 28, h: 26 },
+  ]
+
+  return (
+    <Card
+      hover
+      onClick={onClick}
+      pad={0}
+      style={{
+        overflow: 'hidden',
+        minHeight: 150,
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      <div
+        style={{
+          position: 'relative',
+          flex: 1,
+          minHeight: 150,
+          background: 'var(--bg-tint)',
+          overflow: 'hidden',
+        }}
+      >
+        <div
+          style={{
+            position: 'absolute',
+            left: '8%',
+            right: '8%',
+            top: '48%',
+            height: 8,
+            background: 'var(--surface-2)',
+            borderRadius: 6,
+          }}
+        />
+
+        <div
+          style={{
+            position: 'absolute',
+            top: '12%',
+            bottom: '12%',
+            left: '48%',
+            width: 8,
+            background: 'var(--surface-2)',
+            borderRadius: 6,
+          }}
+        />
+
+        {blocks.map((block, index) => (
+          <div
+            key={index}
+            style={{
+              position: 'absolute',
+              left: `${block.x}%`,
+              top: `${block.y}%`,
+              width: `${block.w}%`,
+              height: `${block.h}%`,
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--r-xs)',
+              boxShadow: 'var(--shadow-sm)',
+            }}
+          />
+        ))}
+
+        {DATA.campus.slice(0, 3).map((place: any) => (
+          <span
+            key={place.id}
+            style={{
+              position: 'absolute',
+              left: `${place.x}%`,
+              top: `${place.y}%`,
+              transform: 'translate(-50%, -100%)',
+              width: 18,
+              height: 18,
+              borderRadius: '50% 50% 50% 0',
+              background: cVar(place.color),
+              border: '2px solid var(--surface)',
+              boxShadow: 'var(--shadow-sm)',
+              rotate: '-45deg',
+            }}
+          >
+            <span
+              style={{
+                position: 'absolute',
+                inset: 4,
+                borderRadius: '50%',
+                background: '#fff',
+                opacity: 0.95,
+              }}
+            />
+          </span>
+        ))}
+
+        <div
+          style={{
+            position: 'absolute',
+            left: 12,
+            right: 12,
+            bottom: 12,
+            padding: '10px 12px',
+            borderRadius: 'var(--r-sm)',
+            background: 'color-mix(in oklch, var(--surface) 78%, transparent)',
+            border: '1px solid color-mix(in oklch, var(--border) 70%, transparent)',
+            backdropFilter: 'blur(10px)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+          }}
+        >
+          <span
+            style={{
+              width: 30,
+              height: 30,
+              borderRadius: 'var(--r-sm)',
+              background: 'var(--primary-soft)',
+              color: 'var(--primary-text)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            <Icon name="mapPin" size={15} stroke={2} />
+          </span>
+
+          <div style={{ minWidth: 0 }}>
+            <div
+              style={{
+                fontSize: 10,
+                color: 'var(--text-3)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+                fontWeight: 600,
+              }}
+            >
+              Mapa
+            </div>
+
+            <div
+              style={{
+                fontSize: 14,
+                fontWeight: 600,
+                color: 'var(--text)',
+                marginTop: 1,
+              }}
+            >
+              Vista del campus
+            </div>
+          </div>
+        </div>
+      </div>
+    </Card>
+  )
+}
 export function Dashboard({ m, go, tasks, onToggle, onOpenTask, variant = 'resumen' }: AnyProps) {
   const upcoming = tasks.filter((t: any) => !t.done).slice(0, 4)
   const pend = tasks.filter((t: any) => !t.done).length
@@ -154,7 +313,7 @@ export function Dashboard({ m, go, tasks, onToggle, onOpenTask, variant = 'resum
         <div style={{ display: 'grid', gridTemplateColumns: m ? '1fr 1fr' : 'repeat(4, 1fr)', gap: m ? 11 : 14 }}>
           <MetricCard icon="tasks" color={1} label="Pendientes" value={pend} sub={`${altas} de alta prioridad`} onClick={() => go('tasks')} />
           <MetricCard icon="clock" color={2} label="Clases hoy" value="4" sub="Próxima en 1 h 20 m" onClick={() => go('schedule')} />
-          <MetricCard icon="chart" color={3} label="Promedio" value="3.8" sub="Sobre 5.0" onClick={() => go('settings')} />
+          <MiniMapCard onClick={() => go('map')} />
           <MetricCard icon="flame" color={4} label="Racha" value={`${DATA.user.streak} d`} sub="¡Sigue así!" />
         </div>
       </FadeIn>
@@ -175,31 +334,19 @@ export function Dashboard({ m, go, tasks, onToggle, onOpenTask, variant = 'resum
         </FadeIn>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: m ? '1fr' : '1fr 1fr', gap: 16 }}>
-        <FadeIn delay={300}>
-          <Card pad={m ? 16 : 18}>
-            <SectionTitle action="Ver semana" onAction={() => go('schedule')}>Rendimiento por materia</SectionTitle>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {DATA.subjects.slice(0, 5).map((s: any) => (
-                <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ minWidth: m ? 96 : 120, fontSize: 12.5, color: 'var(--text-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</div>
-                  <ProgressBar value={s.progress} color={cVar(s.color)} />
-                  <div style={{ minWidth: 28, textAlign: 'right', fontSize: 12.5, fontWeight: 600, color: 'var(--text)', fontFamily: 'var(--font-display)' }}>{s.grade.toFixed(1)}</div>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </FadeIn>
+      <FadeIn delay={300}>
+        <Card pad={m ? 16 : 18}>
+          <SectionTitle action="Ver horario" onAction={() => go('schedule')}>
+            Próximas clases
+          </SectionTitle>
 
-        <FadeIn delay={360}>
-          <Card pad={m ? 16 : 18}>
-            <SectionTitle action="Ver horario" onAction={() => go('schedule')}>Próximas clases</SectionTitle>
-            <div>
-              {DATA.events.slice(0, 4).map((e: any, i: number) => <EventRow key={e.id} e={e} last={i === 3} />)}
-            </div>
-          </Card>
-        </FadeIn>
-      </div>
+          <div>
+            {DATA.events.slice(0, 4).map((e: any, i: number) => (
+              <EventRow key={e.id} e={e} last={i === 3} />
+            ))}
+          </div>
+        </Card>
+      </FadeIn>
     </div>
   )
 }
