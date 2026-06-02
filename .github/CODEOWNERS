@@ -1,0 +1,10 @@
+# CODEOWNERS para uptGo
+
+# Owners correctos de GitHub.
+
+/frontend/ @sunflowerjuan
+/backend/ @FernandoCifuentesB
+/docs/ @sunflowerjuan @FernandoCifuentesB
+/.github/ @sunflowerjuan @FernandoCifuentesB
+
+- @sunflowerjuan @FernandoCifuentesB
