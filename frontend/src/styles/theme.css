@@ -777,3 +777,32 @@ body,
   flex-shrink: 0;
   margin-top: auto;
 }
+/* =========================================================
+   GOOGLE CAMPUS MAP RESPONSIVE
+   ========================================================= */
+
+.campus-google-map-layout {
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 920px) {
+  .campus-google-map-layout {
+    grid-template-columns: 1fr !important;
+  }
+
+  .campus-google-map-panel {
+    border-left: none !important;
+    border-top: 1px solid var(--border);
+  }
+}
+
+@media (max-width: 520px) {
+  .campus-google-map-layout iframe {
+    min-height: 360px !important;
+  }
+
+  .campus-google-map-layout {
+    min-height: auto !important;
+  }
+}

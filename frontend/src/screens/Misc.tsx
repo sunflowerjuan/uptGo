@@ -1,95 +1,92 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { DATA } from '../data/data'
+import { GoogleCampusMap, type CampusPlace } from '../components/GoogleCampusMap'
 import { Icon } from '../components/Icons'
-import {
-  Avatar,
-  Button,
-  Card,
-  FadeIn,
-  SectionTitle,
-  Sheet,
-  cSoftVar,
-  cVar,
-} from '../components/UI'
+import { Avatar, Button, Card, FadeIn, SectionTitle, Sheet, } from '../components/UI'
 
 type AnyProps = Record<string, any>
 
-export function CampusMap({ m, toast }: AnyProps) {
-  const [sel, setSel] = React.useState('p1')
-  const place = DATA.campus.find((p: any) => p.id === sel)
-  const blocks = [
-    { x: 18, y: 18, w: 22, h: 16 }, { x: 52, y: 14, w: 26, h: 20 },
-    { x: 16, y: 44, w: 18, h: 22 }, { x: 40, y: 46, w: 20, h: 16 },
-    { x: 66, y: 50, w: 24, h: 26 }, { x: 30, y: 68, w: 24, h: 14 },
-  ]
+const CAMPUS_PLACES: CampusPlace[] = [
+  {
+    id: 'aula-204',
+    title: 'Aula 204 · Bloque C',
+    subtitle: 'Bases de Datos',
+    query: 'Universidad Pedagógica y Tecnológica de Colombia Tunja Bloque C',
+  },
+  {
+    id: 'biblioteca',
+    title: 'Biblioteca',
+    subtitle: 'Zona de estudio',
+    query: 'Biblioteca UPTC Tunja',
+  },
+  {
+    id: 'laboratorios',
+    title: 'Laboratorios',
+    subtitle: 'Prácticas académicas',
+    query: 'Laboratorios UPTC Tunja',
+  },
+  {
+    id: 'cafeteria',
+    title: 'Cafetería',
+    subtitle: 'Punto de descanso',
+    query: 'Cafetería UPTC Tunja',
+  },
+]
+export function CampusMap({ m }: any) {
+  const [selectedPlace, setSelectedPlace] = useState<CampusPlace>(CAMPUS_PLACES[0])
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <FadeIn>
-        <div>
-          {m && <h1 style={{ fontSize: 22, fontWeight: 600, color: 'var(--text)', fontFamily: 'var(--font-display)', letterSpacing: '-0.02em' }}>Mapa del campus</h1>}
-          <p style={{ fontSize: 13, color: 'var(--text-3)', marginTop: m ? 3 : 0 }}>Ubica aulas, laboratorios y tus lugares de estudio.</p>
-        </div>
-      </FadeIn>
+    <div
+      style={{
+        width: '100%',
+        minWidth: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: m ? 14 : 20,
+      }}
+    >
+      <div>
+        <h1
+          style={{
+            margin: 0,
+            fontFamily: 'var(--font-display)',
+            fontSize: m ? 24 : 28,
+            color: 'var(--text)',
+            letterSpacing: '-0.02em',
+          }}
+        >
+          Mapa del campus
+        </h1>
 
-      <FadeIn delay={60}>
-        <Card pad={0} style={{ overflow: 'hidden' }}>
-          <div style={{ position: 'relative', height: m ? 280 : 380, background: 'var(--bg-tint)', overflow: 'hidden' }}>
-            <div style={{ position: 'absolute', left: '8%', right: '8%', top: '40%', height: 10, background: 'var(--surface-2)', borderRadius: 5 }} />
-            <div style={{ position: 'absolute', top: '10%', bottom: '10%', left: '46%', width: 10, background: 'var(--surface-2)', borderRadius: 5 }} />
+        <p
+          style={{
+            margin: '8px 0 0',
+            fontSize: 14,
+            color: 'var(--text-2)',
+          }}
+        >
+          Ubica aulas, laboratorios y tus lugares de estudio.
+        </p>
+      </div>
 
-            {blocks.map((b, i) => (
-              <div key={i} style={{ position: 'absolute', left: b.x + '%', top: b.y + '%', width: b.w + '%', height: b.h + '%', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', boxShadow: 'var(--shadow-sm)' }} />
-            ))}
+      <GoogleCampusMap
+        selectedPlace={selectedPlace}
+        places={CAMPUS_PLACES}
+        onSelectPlace={setSelectedPlace}
+      />
 
-            {DATA.campus.map((p: any) => {
-              const active = p.id === sel
-              return (
-                <button key={p.id} onClick={() => setSel(p.id)} style={{
-                  position: 'absolute', left: p.x + '%', top: p.y + '%', transform: 'translate(-50%,-100%)',
-                  background: 'none', border: 'none', cursor: 'pointer', zIndex: active ? 5 : 2, transition: 'transform .15s',
-                }}>
-                  <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    <span style={{
-                      width: active ? 36 : 28, height: active ? 36 : 28, borderRadius: '50% 50% 50% 0', transform: 'rotate(-45deg)',
-                      background: cVar(p.color), boxShadow: 'var(--shadow-md)', border: '2px solid var(--surface)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .15s var(--ease)',
-                    }}>
-                      <span style={{ transform: 'rotate(45deg)', color: '#fff', display: 'flex' }}>
-                        <Icon name={p.fav ? 'star' : 'mapPin'} size={active ? 15 : 12} color="#fff" />
-                      </span>
-                    </span>
-                  </span>
-                </button>
-              )
-            })}
-
-            <div style={{ position: 'absolute', top: 12, left: 12, fontFamily: 'monospace', fontSize: 10, color: 'var(--text-3)', background: 'var(--surface)', padding: '4px 9px', borderRadius: 'var(--r-full)', border: '1px solid var(--border)' }}>
-              Campus · vista esquemática
-            </div>
-          </div>
-
-          {place && (
-            <div style={{ padding: m ? 16 : 18, borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 13 }}>
-              <span style={{ width: 40, height: 40, borderRadius: 'var(--r-sm)', background: cSoftVar(place.color), color: cVar(place.color), display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <Icon name={place.fav ? 'star' : 'mapPin'} size={19} />
-              </span>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14.5, fontWeight: 600, color: 'var(--text)' }}>{place.name}</div>
-                <div style={{ fontSize: 12.5, color: 'var(--text-3)' }}>{place.kind}</div>
-              </div>
-              <Button variant="soft" size="sm" icon="arrowRight" onClick={() => toast('Cómo llegar a ' + place.name)}>Ir</Button>
-            </div>
-          )}
-        </Card>
-      </FadeIn>
-
-      <FadeIn delay={120}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '12px 15px', background: 'var(--surface-2)', borderRadius: 'var(--r-md)', fontSize: 12.5, color: 'var(--text-2)' }}>
-          <Icon name="mapPin" size={15} color="var(--text-3)" />
-          La geolocalización se usa solo con la app en primer plano. Sin rastreo en segundo plano.
-        </div>
-      </FadeIn>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          color: 'var(--text-3)',
+          fontSize: 12.5,
+        }}
+      >
+        <Icon name="mapPin" size={14} />
+        La geolocalización se usa solo con la app en primer plano. Sin rastreo en segundo plano.
+      </div>
     </div>
   )
 }
