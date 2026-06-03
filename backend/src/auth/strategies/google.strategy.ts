@@ -16,9 +16,13 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
       clientID: config.getOrThrow<string>('GOOGLE_CLIENT_ID'),
       clientSecret: config.getOrThrow<string>('GOOGLE_CLIENT_SECRET'),
       callbackURL: config.getOrThrow<string>('GOOGLE_CALLBACK_URL'),
-      // offline access — necesario para obtener refresh_token de Google (compatibilidad con Drive, Fase 5)
-      scope: ['email', 'profile'],
+      scope: ['email', 'profile', 'https://www.googleapis.com/auth/drive.file'],
     });
+  }
+
+  // Offline access + forced consent → Google siempre devuelve refresh_token (necesario para Drive)
+  override authorizationParams(): Record<string, string> {
+    return { access_type: 'offline', prompt: 'consent' };
   }
 
   async validate(
