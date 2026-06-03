@@ -806,3 +806,8 @@ body,
     min-height: auto !important;
   }
 }
+@media (max-width: 560px) {
+  .create-form-two-cols {
+    grid-template-columns: 1fr !important;
+  }
+}
