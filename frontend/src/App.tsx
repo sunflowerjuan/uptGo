@@ -315,55 +315,122 @@ export default function App() {
   const mainPad = isMobile ? 'var(--space-pad-mobile)' : 'var(--space-pad-desk)';
 
   const appInner = !authed ? (
-    <div style={{ position: 'absolute', inset: 0, overflow: 'auto' }}><Login onLogin={login} /></div>
+    <Login onLogin={login} />
   ) : (
-    <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg)' }}>
-      {!isError && <TopBar isMobile={isMobile} navStyle={t.navStyle} route={route} go={go} user={DATA.user} online={online}
-        onSearch={() => setSheet('search')} onNotif={() => setSheet('notif')} onMenu={() => setSheet('menu')}
-        onTheme={() => setTweak('dark', !t.dark)} theme={theme} unread={unread} />}
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
-        {!isMobile && !isError && t.navStyle !== 'top' && <Sidebar route={route} go={go} rail={t.navStyle === 'rail'} user={DATA.user} onPomodoro={() => setSheet('pomodoro')} />}
-        <main style={{ flex: 1, minWidth: 0, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', background: 'var(--bg)' }}>
-          {!online && !isError && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '9px 16px', background: 'var(--warn-soft)', color: 'var(--warn)', fontSize: 12.5, cursor: 'pointer' }} onClick={() => go('offline')}>
-              <Icon name="wifiOff" size={15} /><span><strong>Modo sin conexión.</strong> Tus datos están disponibles localmente · se sincronizarán al reconectar.</span>
-            </div>
-          )}
-          <div style={{ padding: isError ? 0 : mainPad, maxWidth: isError ? 'none' : 1180, margin: '0 auto', width: '100%', minHeight: isError ? '100%' : 'auto' }}>
+    <div className={isMobile ? 'uptgo-mobile-shell' : 'uptgo-desktop-shell'}>
+      {!isError && !isMobile && t.navStyle !== 'top' && (
+        <Sidebar
+          route={route}
+          go={go}
+          rail={t.navStyle === 'rail'}
+          user={DATA.user}
+          onPomodoro={() => setSheet('pomodoro')}
+        />
+      )}
+
+      <div className="uptgo-main-shell">
+        {!isError && (
+          <TopBar
+            isMobile={isMobile}
+            navStyle={t.navStyle}
+            route={route}
+            go={go}
+            user={DATA.user}
+            online={online}
+            onSearch={() => setSheet('search')}
+            onNotif={() => setSheet('notif')}
+            onMenu={() => setSheet('menu')}
+            onTheme={() => setTweak('dark', !t.dark)}
+            theme={theme}
+            unread={unread}
+          />
+        )}
+
+        {!online && !isError && (
+          <button
+            onClick={() => go('offline')}
+            style={{
+              margin: isMobile ? '10px 14px 0' : '12px 28px 0',
+              padding: '10px 14px',
+              borderRadius: 'var(--r-md)',
+              border: '1px solid var(--warn)',
+              background: 'var(--warn-soft)',
+              color: 'var(--text)',
+              fontFamily: 'var(--font-ui)',
+              fontSize: 13,
+              cursor: 'pointer',
+              textAlign: 'left',
+            }}
+          >
+            Modo sin conexión. Tus datos están disponibles localmente · se sincronizarán al reconectar.
+          </button>
+        )}
+
+        <main
+          className="uptgo-main"
+          style={{
+            padding: isMobile ? mainPad : mainPad,
+          }}
+        >
+          <div className={isMobile ? 'uptgo-mobile-content' : 'uptgo-content'}>
             {screen}
           </div>
         </main>
-      </div>
-      {isMobile && !isError && <BottomNav route={route} go={go} onAdd={() => setSheet('add')} />}
 
-      {/* sheets */}
-      <SearchSheet open={sheet === 'search'} onClose={() => setSheet(null)} go={go} onOpenTask={openTask} />
-      <NotifSheet open={sheet === 'notif'} onClose={() => setSheet(null)} />
-      <QuickAddSheet open={sheet === 'add'} onClose={() => setSheet(null)} toast={toast} />
-      <MenuSheet open={sheet === 'menu'} onClose={() => setSheet(null)} route={route} go={go} user={DATA.user} theme={theme} onTheme={() => setTweak('dark', !t.dark)} onPomodoro={() => setSheet('pomodoro')} />
-      <Pomodoro open={sheet === 'pomodoro'} onClose={() => setSheet(null)} />
-      <Toast msg={toastMsg} />
+        {isMobile && !isError && (
+          <BottomNav
+            route={route}
+            go={go}
+            onAdd={() => setSheet('add')}
+          />
+        )}
+
+        <SearchSheet
+          open={sheet === 'search'}
+          onClose={() => setSheet(null)}
+          go={go}
+          onOpenTask={openTask}
+        />
+
+        <NotifSheet
+          open={sheet === 'notif'}
+          onClose={() => setSheet(null)}
+        />
+
+        <QuickAddSheet
+          open={sheet === 'add'}
+          onClose={() => setSheet(null)}
+          toast={toast}
+        />
+
+        <MenuSheet
+          open={sheet === 'menu'}
+          onClose={() => setSheet(null)}
+          route={route}
+          go={go}
+          user={DATA.user}
+          theme={theme}
+          onTheme={() => setTweak('dark', !t.dark)}
+          onPomodoro={() => setSheet('pomodoro')}
+        />
+
+        <Pomodoro
+          open={sheet === 'pomodoro'}
+          onClose={() => setSheet(null)}
+        />
+
+        {toastMsg && <Toast msg={toastMsg} />}
+      </div>
     </div>
   );
 
   return (
-    <div className="uptgo-root" data-palette={t.palette} data-theme={theme}
-      style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg-tint)', color: 'var(--text)', fontFamily: 'var(--font-ui)' }}>
-      {/* workspace toolbar */}
-
-      {/* stage */}
-      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: isMobile ? '20px' : '0' }}>
-        {isMobile ? (
-          <div style={{ width: 402, maxWidth: '100%', height: 'min(844px, 100%)', background: '#0b0b0c', borderRadius: 46, padding: 11, boxShadow: 'var(--shadow-lg)', flexShrink: 0 }}>
-            <div style={{ width: '100%', height: '100%', borderRadius: 36, overflow: 'hidden', display: 'flex', flexDirection: 'column', background: 'var(--bg)', position: 'relative' }}>
-              {authed && <StatusBar online={online} />}
-              <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>{appInner}</div>
-            </div>
-          </div>
-        ) : (
-          <div style={{ width: '100%', height: '100%', overflow: 'hidden', position: 'relative' }}>{appInner}</div>
-        )}
-      </div>
+    <div
+      className="uptgo-root"
+      data-theme={theme}
+      data-palette={t.palette}
+    >
+      {appInner}
     </div>
   );
 }
