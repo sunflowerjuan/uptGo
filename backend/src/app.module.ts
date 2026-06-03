@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AuthModule } from './auth/auth.module';
 import { HealthModule } from './health/health.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { SettingsModule } from './settings/settings.module';
 import { UsersModule } from './users/users.module';
@@ -27,6 +28,7 @@ import { UsersModule } from './users/users.module';
     UsersModule,
     AuthModule,
     SettingsModule,
+    NotificationsModule,
   ],
 })
 export class AppModule {}
