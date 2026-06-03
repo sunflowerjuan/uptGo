@@ -42,8 +42,11 @@ export function Calendar({ m, onAdd }: AnyProps) {
   const [selectedCreateDate, setSelectedCreateDate] = React.useState<string | null>(null)
   const [createType, setCreateType] = React.useState<CreateItemType | null>(null)
 
-  const year = 2026
-  const month = 4
+  const [currentDate, setCurrentDate] = React.useState(new Date(2026, 4, 1))
+
+  const year = currentDate.getFullYear()
+  const month = currentDate.getMonth()
+  const isMockMonth = year === 2026 && month === 4
   const first = new Date(year, month, 1)
   const startDow = (first.getDay() + 6) % 7
   const daysInMonth = new Date(year, month + 1, 0).getDate()
@@ -82,6 +85,10 @@ export function Calendar({ m, onAdd }: AnyProps) {
   const agendaDay = (day: number) => {
     const items: any[] = []
 
+    if (!isMockMonth) {
+      return items
+    }
+
     if (DAY_MARKS[day]) {
       if (day === 8) {
         return DATA.events.map((event: any) => ({
@@ -114,7 +121,38 @@ export function Calendar({ m, onAdd }: AnyProps) {
   const monthPreview = (day: number) => {
     return agendaDay(day).slice(0, m ? 1 : 2)
   }
+  const goPrevMonth = () => {
+    setCurrentDate((current) => {
+      return new Date(current.getFullYear(), current.getMonth() - 1, 1)
+    })
 
+    setSel(1)
+    setPopupDay(null)
+  }
+
+  const goNextMonth = () => {
+    setCurrentDate((current) => {
+      return new Date(current.getFullYear(), current.getMonth() + 1, 1)
+    })
+
+    setSel(1)
+    setPopupDay(null)
+  }
+
+  const monthAgenda = () => {
+    if (!isMockMonth) {
+      return []
+    }
+    return Array.from({ length: daysInMonth }, (_, index) => {
+      const day = index + 1
+      const items = agendaDay(day)
+
+      return {
+        day,
+        items,
+      }
+    }).filter((group) => group.items.length > 0)
+  }
   const createOptions: Array<{
     type: CreateItemType
     icon: string
@@ -231,8 +269,9 @@ export function Calendar({ m, onAdd }: AnyProps) {
           </h2>
 
           <div style={{ display: 'flex', gap: 6 }}>
-            <IconButton name="chevronLeft" size={34} iconSize={16} />
-            <IconButton name="chevronRight" size={34} iconSize={16} />
+            <IconButton name="chevronLeft" size={34} iconSize={16} onClick={goPrevMonth} />
+
+            <IconButton name="chevronRight" size={34} iconSize={16} onClick={goNextMonth} />
           </div>
         </div>
       </FadeIn>
@@ -414,78 +453,147 @@ export function Calendar({ m, onAdd }: AnyProps) {
         <FadeIn delay={110}>
           <Card pad={m ? 16 : 20}>
             <SectionTitle>
-              {sel === 8 ? 'Hoy · ' : ''}
-              {sel} de {MONTHS[month]}
+              Agenda de {MONTHS[month]} {year}
             </SectionTitle>
 
-            {agendaDay(sel).length > 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                {agendaDay(sel).map((item: any, index: number, arr: any[]) => (
-                  <div
-                    key={index}
-                    style={{
-                      display: 'flex',
-                      gap: 13,
-                      padding: '11px 0',
-                      borderBottom:
-                        index === arr.length - 1 ? 'none' : '1px solid var(--border)',
-                    }}
-                  >
+            {monthAgenda().length > 0 ? (
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 22,
+                }}
+              >
+                {monthAgenda().map((group) => (
+                  <div key={group.day}>
                     <div
                       style={{
-                        minWidth: 46,
-                        fontSize: 12.5,
-                        color: 'var(--text-2)',
-                        fontWeight: 600,
-                        fontFamily: 'var(--font-display)',
-                        paddingTop: 1,
+                        display: 'flex',
+                        alignItems: 'baseline',
+                        gap: 8,
+                        marginBottom: 10,
                       }}
                     >
-                      {item.time}
+                      <h3
+                        style={{
+                          margin: 0,
+                          fontFamily: 'var(--font-display)',
+                          fontSize: 15,
+                          fontWeight: 700,
+                          color: 'var(--text)',
+                        }}
+                      >
+                        {group.day === 8 && isMockMonth ? 'Hoy · ' : ''}
+                        {group.day} de {MONTHS[month]}
+                      </h3>
+
+                      <span
+                        style={{
+                          fontSize: 12,
+                          color: 'var(--text-3)',
+                        }}
+                      >
+                        {group.items.length} actividad
+                        {group.items.length === 1 ? '' : 'es'}
+                      </span>
                     </div>
 
                     <div
                       style={{
-                        width: 3,
-                        borderRadius: 3,
-                        background: cVar(item.color),
-                        flexShrink: 0,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        borderTop: '1px solid var(--border)',
                       }}
-                    />
+                    >
+                      {group.items.map((item: any, index: number) => (
+                        <div
+                          key={`${group.day}-${index}`}
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: m
+                              ? '48px minmax(0, 1fr)'
+                              : '64px minmax(0, 1fr) auto',
+                            gap: m ? 10 : 14,
+                            alignItems: 'center',
+                            padding: '14px 0',
+                            borderBottom: '1px solid var(--border)',
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontSize: 13,
+                              color: 'var(--text-2)',
+                              fontWeight: 700,
+                              fontFamily: 'var(--font-display)',
+                            }}
+                          >
+                            {item.time}
+                          </div>
 
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div
-                        style={{
-                          fontSize: 13.5,
-                          color: 'var(--text)',
-                          fontWeight: 500,
-                        }}
-                      >
-                        {item.title}
-                      </div>
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'flex-start',
+                              gap: 12,
+                              minWidth: 0,
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: 3,
+                                alignSelf: 'stretch',
+                                minHeight: 40,
+                                borderRadius: 3,
+                                background: cVar(item.color),
+                                flexShrink: 0,
+                              }}
+                            />
 
-                      <div
-                        style={{
-                          fontSize: 11.5,
-                          color: 'var(--text-3)',
-                          marginTop: 2,
-                        }}
-                      >
-                        {item.sub}
-                      </div>
+                            <div style={{ minWidth: 0 }}>
+                              <div
+                                style={{
+                                  fontSize: 14,
+                                  color: 'var(--text)',
+                                  fontWeight: 600,
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                }}
+                              >
+                                {item.title}
+                              </div>
+
+                              <div
+                                style={{
+                                  fontSize: 12,
+                                  color: 'var(--text-3)',
+                                  marginTop: 3,
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                }}
+                              >
+                                {item.sub}
+                              </div>
+                            </div>
+                          </div>
+
+                          {!m && (
+                            <Pill color="var(--text-2)" bg="var(--surface-2)">
+                              {item.type}
+                            </Pill>
+                          )}
+                        </div>
+                      ))}
                     </div>
-
-                    <Pill color="var(--text-2)" bg="var(--surface-2)">
-                      {item.type}
-                    </Pill>
                   </div>
                 ))}
               </div>
             ) : (
               <EmptyState
                 icon="calendar"
-                title="Día libre"
-                body="No hay actividades programadas."
+                title="Sin actividades este mes"
+                body="No hay eventos, clases o tareas programadas para este mes."
               />
             )}
           </Card>
@@ -801,16 +909,52 @@ export function Calendar({ m, onAdd }: AnyProps) {
     </div>
   )
 }
-export function Schedule({ m, onAdd, toast }: AnyProps) {
-  const days = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie']
+
+export function Schedule({ m, onAdd, toast, scheduleItems = [] }: AnyProps) {
+  const days = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
   const hours = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
   const rowH = m ? 44 : 52
   const headH = m ? 34 : 40
 
   const [dayIdx, setDayIdx] = React.useState(0)
 
-  const shownDays = m ? [dayIdx] : [0, 1, 2, 3, 4]
-  const gridWidth = m ? '100%' : 820
+  const shownDays = m ? [dayIdx] : [0, 1, 2, 3, 4, 5, 6]
+  const gridWidth = m ? '100%' : 1120
+
+  const fullSchedule = [
+    ...scheduleItems,
+    ...DATA.schedule,
+  ]
+
+  const createdSubjects = scheduleItems
+    .filter((block: any) => block.subjectData)
+    .map((block: any) => block.subjectData)
+
+  const uniqueCreatedSubjects = createdSubjects.filter(
+    (subject: any, index: number, arr: any[]) =>
+      arr.findIndex((item) => item.id === subject.id) === index,
+  )
+
+  const getSubject = (block: any) => {
+    if (block.subjectData) {
+      return {
+        id: block.subjectData.id,
+        name: block.subjectData.name,
+        teacher: block.subjectData.teacher,
+        room: block.room || 'Sin aula',
+        color: block.subjectData.color || 1,
+      }
+    }
+
+    return subjectById(block.subject)
+  }
+
+  const getBlockKey = (block: any, index: number) => {
+    return (
+      block.id ||
+      `${block.day}-${block.start}-${block.end}-${block.subject}-${index}`
+    )
+  }
 
   return (
     <FadeIn>
@@ -841,7 +985,7 @@ export function Schedule({ m, onAdd, toast }: AnyProps) {
                 color: 'var(--text-2)',
               }}
             >
-              Semana típica · 6 materias · 18 créditos
+              Semana típica · {uniqueCreatedSubjects.length + DATA.subjects.length} materias
             </p>
           </div>
         )}
@@ -849,7 +993,7 @@ export function Schedule({ m, onAdd, toast }: AnyProps) {
         {!m && (
           <SectionTitle
             title="Horario"
-            subtitle="Semana típica · 6 materias · 18 créditos"
+            subtitle={`Semana típica · ${uniqueCreatedSubjects.length + DATA.subjects.length} materias`}
             action={
               <Button size="sm" onClick={onAdd}>
                 Agregar clase
@@ -863,7 +1007,7 @@ export function Schedule({ m, onAdd, toast }: AnyProps) {
             className="schedule-day-tabs"
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
+              gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
               gap: 7,
               width: '100%',
               marginBottom: 14,
@@ -896,6 +1040,78 @@ export function Schedule({ m, onAdd, toast }: AnyProps) {
           </div>
         )}
 
+        <div
+          className="schedule-legend"
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 7,
+            marginBottom: 14,
+            width: '100%',
+            minWidth: 0,
+          }}
+        >
+          {uniqueCreatedSubjects.map((subject: any) => (
+            <span
+              key={subject.id}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                maxWidth: '100%',
+                padding: '5px 9px',
+                borderRadius: 'var(--r-full)',
+                background: cSoftVar(subject.color || 1),
+                color: cVar(subject.color || 1),
+                fontSize: 11,
+                fontWeight: 700,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <span
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: '50%',
+                  background: cVar(subject.color || 1),
+                  flexShrink: 0,
+                }}
+              />
+              {subject.name}
+            </span>
+          ))}
+
+          {DATA.subjects.map((subject: any) => (
+            <span
+              key={subject.id}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                maxWidth: '100%',
+                padding: '5px 9px',
+                borderRadius: 'var(--r-full)',
+                background: cSoftVar(subject.color),
+                color: cVar(subject.color),
+                fontSize: 11,
+                fontWeight: 700,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <span
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: '50%',
+                  background: cVar(subject.color),
+                  flexShrink: 0,
+                }}
+              />
+              {subject.name}
+            </span>
+          ))}
+        </div>
+
         <Card
           style={{
             width: '100%',
@@ -916,11 +1132,11 @@ export function Schedule({ m, onAdd, toast }: AnyProps) {
               style={{
                 position: 'relative',
                 width: gridWidth,
-                minWidth: m ? 0 : 820,
+                minWidth: m ? 0 : 1120,
                 display: 'grid',
                 gridTemplateColumns: m
                   ? '44px minmax(0, 1fr)'
-                  : `56px repeat(${shownDays.length}, minmax(142px, 1fr))`,
+                  : `56px repeat(${shownDays.length}, minmax(130px, 1fr))`,
               }}
             >
               <div
@@ -986,24 +1202,32 @@ export function Schedule({ m, onAdd, toast }: AnyProps) {
                     />
                   ))}
 
-                  {DATA.schedule
+                  {fullSchedule
                     .filter((block: any) => block.day === dayIndex)
-                    .map((block: any) => {
-                      const subject = subjectById(block.subject)
+                    .map((block: any, index: number) => {
+                      const subject = getSubject(block)
                       const top = (block.start - hours[0]) * rowH
                       const height = Math.max(
                         (block.end - block.start) * rowH - 5,
                         42,
                       )
 
+                      const room = block.room || subject.room || 'Sin aula'
+                      const color = subject.color || 1
+
                       return (
                         <button
-                          key={`${block.day}-${block.start}-${block.subject}`}
-                          onClick={() =>
-                            toast(
-                              `${subject.name} · ${block.start}:00–${block.end}:00`,
-                            )
-                          }
+                          key={getBlockKey(block, index)}
+                          onClick={() => {
+                            const text = `${subject.name} · ${block.start}:00–${block.end}:00`
+
+                            if (block.locationUrl) {
+                              toast(`${text} · ubicación asignada`)
+                              return
+                            }
+
+                            toast(text)
+                          }}
                           style={{
                             position: 'absolute',
                             top: top + 3,
@@ -1012,13 +1236,15 @@ export function Schedule({ m, onAdd, toast }: AnyProps) {
                             height,
                             cursor: 'pointer',
                             textAlign: 'left',
-                            background: cSoftVar(subject.color),
+                            background: cSoftVar(color),
                             border: 'none',
-                            borderLeft: `3px solid ${cVar(subject.color)}`,
+                            borderLeft: `3px solid ${cVar(color)}`,
                             borderRadius: 'var(--r-xs)',
                             padding: m ? '7px 8px' : '8px 10px',
                             overflow: 'hidden',
                             color: 'var(--text)',
+                            zIndex: block.created ? 3 : 1,
+                            boxShadow: block.created ? 'var(--shadow-sm)' : 'none',
                           }}
                         >
                           <strong
@@ -1026,7 +1252,7 @@ export function Schedule({ m, onAdd, toast }: AnyProps) {
                               display: 'block',
                               fontSize: m ? 11.5 : 12.5,
                               lineHeight: 1.15,
-                              color: cVar(subject.color),
+                              color: cVar(color),
                               whiteSpace: 'nowrap',
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
@@ -1061,7 +1287,24 @@ export function Schedule({ m, onAdd, toast }: AnyProps) {
                                 textOverflow: 'ellipsis',
                               }}
                             >
-                              {subject.room}
+                              {room}
+                            </span>
+                          )}
+
+                          {block.created && height > 72 && (
+                            <span
+                              style={{
+                                display: 'block',
+                                marginTop: 3,
+                                fontSize: m ? 9.5 : 10.5,
+                                color: cVar(color),
+                                fontWeight: 700,
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                              }}
+                            >
+                              Nueva clase
                             </span>
                           )}
                         </button>
@@ -1072,48 +1315,6 @@ export function Schedule({ m, onAdd, toast }: AnyProps) {
             </div>
           </div>
         </Card>
-
-        <div
-          className="schedule-legend"
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 7,
-            marginTop: 14,
-            width: '100%',
-            minWidth: 0,
-          }}
-        >
-          {DATA.subjects.map((subject: any) => (
-            <span
-              key={subject.id}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 5,
-                maxWidth: '100%',
-                padding: '5px 9px',
-                borderRadius: 'var(--r-full)',
-                background: cSoftVar(subject.color),
-                color: cVar(subject.color),
-                fontSize: 11,
-                fontWeight: 700,
-                whiteSpace: 'nowrap',
-              }}
-            >
-              <span
-                style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: '50%',
-                  background: cVar(subject.color),
-                  flexShrink: 0,
-                }}
-              />
-              {subject.name}
-            </span>
-          ))}
-        </div>
       </div>
     </FadeIn>
   )

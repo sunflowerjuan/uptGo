@@ -209,9 +209,7 @@ export function CreateAcademicItemModal({
     }
 
     const validate = () => {
-        if (!form.title.trim()) {
-            return 'El título es obligatorio.'
-        }
+
 
         if (type === 'evento' && !form.date) {
             return 'La fecha es obligatoria.'
