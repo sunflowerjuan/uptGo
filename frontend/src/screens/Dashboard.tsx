@@ -1,16 +1,7 @@
 import { DATA } from '../data/data'
+import { useEffect, useState } from 'react'
 import { Icon } from '../components/Icons'
-import {
-  Button,
-  Card,
-  FadeIn,
-  Pill,
-  PRIORITY,
-  SectionTitle,
-  cSoftVar,
-  cVar,
-  subjectById,
-} from '../components/UI'
+import { Button, Card, FadeIn, Pill, PRIORITY, SectionTitle, cSoftVar, cVar, subjectById, } from '../components/UI'
 
 type AnyProps = Record<string, any>
 
@@ -115,12 +106,39 @@ function HeroFocus({ m, onOpenTask, go }: AnyProps) {
 }
 
 function MiniMapCard({ onClick }: AnyProps) {
-  const blocks = [
-    { x: 10, y: 18, w: 22, h: 18 },
-    { x: 46, y: 12, w: 30, h: 20 },
-    { x: 14, y: 56, w: 24, h: 22 },
-    { x: 58, y: 54, w: 28, h: 26 },
-  ]
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null)
+  const [status, setStatus] = useState<'loading' | 'ready' | 'denied'>('loading')
+
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      setStatus('denied')
+      return
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setCoords({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        })
+        setStatus('ready')
+      },
+      () => {
+        setStatus('denied')
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 8000,
+        maximumAge: 1000 * 60 * 5,
+      },
+    )
+  }, [])
+
+  const mapQuery = coords
+    ? `${coords.lat},${coords.lng}`
+    : 'Universidad Pedagógica y Tecnológica de Colombia Tunja'
+
+  const mapUrl = `https://www.google.com/maps?q=${encodeURIComponent(mapQuery)}&z=17&output=embed`
 
   return (
     <Card
@@ -132,6 +150,7 @@ function MiniMapCard({ onClick }: AnyProps) {
         minHeight: 150,
         display: 'flex',
         flexDirection: 'column',
+        position: 'relative',
       }}
     >
       <div
@@ -143,75 +162,31 @@ function MiniMapCard({ onClick }: AnyProps) {
           overflow: 'hidden',
         }}
       >
-        <div
+        <iframe
+          title="Mini mapa de ubicación actual"
+          src={mapUrl}
+          loading="lazy"
+          referrerPolicy="no-referrer-when-downgrade"
           style={{
-            position: 'absolute',
-            left: '8%',
-            right: '8%',
-            top: '48%',
-            height: 8,
-            background: 'var(--surface-2)',
-            borderRadius: 6,
+            width: '100%',
+            height: '100%',
+            minHeight: 150,
+            border: 0,
+            display: 'block',
+            filter: 'saturate(0.85) contrast(0.95)',
+            pointerEvents: 'none',
           }}
         />
 
         <div
           style={{
             position: 'absolute',
-            top: '12%',
-            bottom: '12%',
-            left: '48%',
-            width: 8,
-            background: 'var(--surface-2)',
-            borderRadius: 6,
+            inset: 0,
+            background:
+              'linear-gradient(180deg, transparent 45%, color-mix(in oklch, var(--surface) 82%, transparent) 100%)',
+            pointerEvents: 'none',
           }}
         />
-
-        {blocks.map((block, index) => (
-          <div
-            key={index}
-            style={{
-              position: 'absolute',
-              left: `${block.x}%`,
-              top: `${block.y}%`,
-              width: `${block.w}%`,
-              height: `${block.h}%`,
-              background: 'var(--surface)',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--r-xs)',
-              boxShadow: 'var(--shadow-sm)',
-            }}
-          />
-        ))}
-
-        {DATA.campus.slice(0, 3).map((place: any) => (
-          <span
-            key={place.id}
-            style={{
-              position: 'absolute',
-              left: `${place.x}%`,
-              top: `${place.y}%`,
-              transform: 'translate(-50%, -100%)',
-              width: 18,
-              height: 18,
-              borderRadius: '50% 50% 50% 0',
-              background: cVar(place.color),
-              border: '2px solid var(--surface)',
-              boxShadow: 'var(--shadow-sm)',
-              rotate: '-45deg',
-            }}
-          >
-            <span
-              style={{
-                position: 'absolute',
-                inset: 4,
-                borderRadius: '50%',
-                background: '#fff',
-                opacity: 0.95,
-              }}
-            />
-          </span>
-        ))}
 
         <div
           style={{
@@ -221,12 +196,13 @@ function MiniMapCard({ onClick }: AnyProps) {
             bottom: 12,
             padding: '10px 12px',
             borderRadius: 'var(--r-sm)',
-            background: 'color-mix(in oklch, var(--surface) 78%, transparent)',
+            background: 'color-mix(in oklch, var(--surface) 88%, transparent)',
             border: '1px solid color-mix(in oklch, var(--border) 70%, transparent)',
             backdropFilter: 'blur(10px)',
             display: 'flex',
             alignItems: 'center',
             gap: 10,
+            boxShadow: 'var(--shadow-sm)',
           }}
         >
           <span
@@ -234,8 +210,8 @@ function MiniMapCard({ onClick }: AnyProps) {
               width: 30,
               height: 30,
               borderRadius: 'var(--r-sm)',
-              background: 'var(--primary-soft)',
-              color: 'var(--primary-text)',
+              background: coords ? 'var(--primary-soft)' : 'var(--surface-2)',
+              color: coords ? 'var(--primary-text)' : 'var(--text-3)',
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -245,7 +221,7 @@ function MiniMapCard({ onClick }: AnyProps) {
             <Icon name="mapPin" size={15} stroke={2} />
           </span>
 
-          <div style={{ minWidth: 0 }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
             <div
               style={{
                 fontSize: 10,
@@ -255,7 +231,11 @@ function MiniMapCard({ onClick }: AnyProps) {
                 fontWeight: 600,
               }}
             >
-              Mapa
+              {status === 'ready'
+                ? 'Ubicación actual'
+                : status === 'loading'
+                  ? 'Ubicando...'
+                  : 'Mapa'}
             </div>
 
             <div
@@ -264,9 +244,16 @@ function MiniMapCard({ onClick }: AnyProps) {
                 fontWeight: 600,
                 color: 'var(--text)',
                 marginTop: 1,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
               }}
             >
-              Vista del campus
+              {status === 'ready'
+                ? 'Estás aquí'
+                : status === 'loading'
+                  ? 'Buscando ubicación'
+                  : 'Vista del campus'}
             </div>
           </div>
         </div>
