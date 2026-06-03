@@ -10,8 +10,14 @@ import { Tasks, TaskDetail } from './screens/Tasks'
 import { Calendar, Schedule } from './screens/Calendar'
 import { Notes, Reminders } from './screens/Notes'
 import { CampusMap, Settings, Pomodoro } from './screens/Misc'
-import { CreateReminderModal, type ReminderParent, } from './components/CreateReminderModal'
-import { CreateAcademicItemModal, type CreateItemType, } from './components/CreateAcademicItemModal'
+import {
+  CreateReminderModal,
+  type ReminderParent,
+} from './components/CreateReminderModal'
+import {
+  CreateAcademicItemModal,
+  type CreateItemType,
+} from './components/CreateAcademicItemModal'
 
 import './styles/theme.css'
 
@@ -80,6 +86,16 @@ const TYPE_LABEL_TEXT: Record<CreateItemType, string> = {
   nota: 'Nota',
 }
 
+const DAY_INDEX: Record<string, number> = {
+  Lun: 0,
+  Mar: 1,
+  Mié: 2,
+  Jue: 3,
+  Vie: 4,
+  Sáb: 5,
+  Dom: 6,
+}
+
 function useIsMobile(breakpoint = 820) {
   const getIsMobile = () => {
     if (typeof window === 'undefined') return false
@@ -105,6 +121,7 @@ function useIsMobile(breakpoint = 820) {
 
   return isMobile
 }
+
 function Toast({ msg }: ToastProps) {
   return (
     <div
@@ -441,19 +458,18 @@ function QuickAddSheet({ open, onClose, onPickType }: QuickAddSheetProps) {
     </Sheet>
   )
 }
+
 export default function App() {
   const [t, setTweak] = useTweaks<TweakValues>(TWEAK_DEFAULTS)
   const theme = t.dark ? 'dark' : 'light'
   const isMobile = useIsMobile()
-  const [reminderModalOpen, setReminderModalOpen] = useState(false)
-  const [reminderParent, setReminderParent] = useState<ReminderParent | null>(null)
 
   window.__UPTGO_MOBILE__ = isMobile
 
-  const openReminderModal = (parent?: ReminderParent | null) => {
-    setReminderParent(parent || null)
-    setReminderModalOpen(true)
-  }
+  const [reminderModalOpen, setReminderModalOpen] = useState(false)
+  const [reminderParent, setReminderParent] = useState<ReminderParent | null>(null)
+  const [createdScheduleBlocks, setCreatedScheduleBlocks] = useState<any[]>([])
+
   const [authed, setAuthed] = useState(
     () => localStorage.getItem('uptgo_auth') === '1',
   )
@@ -478,21 +494,6 @@ export default function App() {
     localStorage.setItem('uptgo_route', route)
   }, [route])
 
-  const login = () => {
-    setAuthed(true)
-    localStorage.setItem('uptgo_auth', '1')
-    go('dashboard')
-  }
-
-  const logout = () => {
-    setAuthed(false)
-    localStorage.removeItem('uptgo_auth')
-    setOpenTaskId(null)
-    setSheet(null)
-    setCreateModalType(null)
-    go('dashboard')
-  }
-
   const toast = (message: string) => {
     setToastMsg(message)
 
@@ -508,11 +509,79 @@ export default function App() {
     setRoute(nextRoute as AppRoute)
   }
 
+  const login = () => {
+    setAuthed(true)
+    localStorage.setItem('uptgo_auth', '1')
+    go('dashboard')
+  }
+
+  const logout = () => {
+    setAuthed(false)
+    localStorage.removeItem('uptgo_auth')
+    setOpenTaskId(null)
+    setSheet(null)
+    setCreateModalType(null)
+    setReminderModalOpen(false)
+    setReminderParent(null)
+    go('dashboard')
+  }
+
   const openTask = (id: string | number) => {
     setOpenTaskId(id)
     setRoute('tasks')
   }
 
+  const openReminderModal = (parent?: ReminderParent | null) => {
+    setReminderParent(parent || null)
+    setReminderModalOpen(true)
+  }
+
+  const hourToNumber = (time: string) => {
+    const [hour] = time.split(':')
+    return Number(hour)
+  }
+
+  const addCreatedClassToSchedule = (item: any) => {
+    if (item.type !== 'clase') return
+
+    const subjectColor =
+      item.subjectMode === 'new'
+        ? ((createdScheduleBlocks.length % 6) + 1)
+        : undefined
+
+    const subjectData =
+      item.subjectMode === 'new'
+        ? {
+          ...(item.subjectData || {}),
+          color: subjectColor,
+        }
+        : null
+
+    const subjectId =
+      item.subjectMode === 'new'
+        ? subjectData?.id
+        : item.subject
+
+    const blocks = (item.days || [])
+      .map((day: string) => ({
+        id: `${item.id}-${day}`,
+        day: DAY_INDEX[day],
+        start: hourToNumber(item.startTime),
+        end: hourToNumber(item.endTime),
+        subject: subjectId,
+        title: item.title,
+        room: item.room || item.location || 'Sin aula',
+        location: item.location || '',
+        locationUrl: item.locationUrl || '',
+        teacher: subjectData?.teacher || '',
+        created: true,
+        subjectData,
+      }))
+      .filter((block: any) => block.day !== undefined)
+
+    setCreatedScheduleBlocks((current) => [...blocks, ...current])
+    setRoute('schedule')
+  }
   const toggleTask = (id: string | number) => {
     setTasks((currentTasks) =>
       currentTasks.map((task) =>
@@ -533,8 +602,7 @@ export default function App() {
         reminder.id === id
           ? {
             ...reminder,
-            status:
-              reminder.status === 'activo' ? 'completado' : 'activo',
+            status: reminder.status === 'activo' ? 'completado' : 'activo',
           }
           : reminder,
       ),
@@ -599,6 +667,7 @@ export default function App() {
         screen = (
           <Schedule
             m={isMobile}
+            scheduleItems={createdScheduleBlocks}
             onAdd={() => setCreateModalType('clase')}
             toast={toast}
           />
@@ -622,7 +691,7 @@ export default function App() {
             reminders={reminders}
             onToggle={toggleReminder}
             onAdd={() => openReminderModal(null)}
-            onPomodoro={() => setSheet('pomodoro')}
+            toast={toast}
           />
         )
         break
@@ -770,7 +839,13 @@ export default function App() {
           type={createModalType || 'evento'}
           onClose={() => setCreateModalType(null)}
           onCreated={(item) => {
-            toast(`${TYPE_LABEL_TEXT[item.type as CreateItemType]} creado correctamente`)
+            if (item.type === 'clase') {
+              addCreatedClassToSchedule(item)
+            }
+
+            toast(
+              `${TYPE_LABEL_TEXT[item.type as CreateItemType]} creado correctamente`,
+            )
           }}
         />
 
@@ -782,6 +857,7 @@ export default function App() {
             setReminderParent(null)
           }}
           onCreated={(reminder) => {
+            setReminders((currentReminders) => [reminder, ...currentReminders])
             toast(`Recordatorio creado para ${reminder.parentTitle}`)
           }}
         />
