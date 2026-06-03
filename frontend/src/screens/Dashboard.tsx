@@ -16,14 +16,18 @@ type AnyProps = Record<string, any>
 
 function MetricCard({ icon, color, label, value, sub, onClick }: AnyProps) {
   return (
-    <Card hover={!!onClick} onClick={onClick} pad={16} style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+    <Card hover={!!onClick} onClick={onClick} pad={16} style={{ width: '100%', minWidth: 0, maxWidth: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: 0, }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <span style={{ width: 32, height: 32, borderRadius: 'var(--r-sm)', background: cSoftVar(color), color: cVar(color), display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
           <Icon name={icon} size={16} stroke={2} />
         </span>
       </div>
       <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 500 }}>{label}</div>
-      <div style={{ fontSize: 28, fontWeight: 500, color: 'var(--text)', lineHeight: 1.1, marginTop: 4, fontFamily: 'var(--font-display)' }}>{value}</div>
+      <div style={{
+        fontSize: 'clamp(22px, 7vw, 28px)', fontWeight: 500, color: 'var(--text)', lineHeight: 1.1, marginTop: 4, fontFamily: 'var(--font-display)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      }}>
+        {value}
+      </div>
       <div style={{ fontSize: 11.5, color: 'var(--text-3)', marginTop: 4 }}>{sub}</div>
     </Card>
   )
@@ -34,7 +38,7 @@ function DashTaskRow({ t, onToggle, onOpen }: AnyProps) {
   const pr = PRIORITY[t.priority as keyof typeof PRIORITY] || PRIORITY.media
 
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 11, padding: '11px 0', borderBottom: '1px solid var(--border)' }}>
+    <div style={{ width: '100%', minWidth: 0, display: 'flex', alignItems: 'flex-start', gap: 11, padding: '11px 0', borderBottom: '1px solid var(--border)', overflow: 'hidden', }}>
       <button onClick={(e) => { e.stopPropagation(); onToggle(t.id) }} style={{
         width: 19, height: 19, borderRadius: 6, marginTop: 1, flexShrink: 0, cursor: 'pointer',
         border: t.done ? 'none' : '1.8px solid var(--border-strong)', background: t.done ? 'var(--primary)' : 'transparent',
@@ -44,7 +48,7 @@ function DashTaskRow({ t, onToggle, onOpen }: AnyProps) {
       </button>
 
       <div style={{ flex: 1, minWidth: 0, cursor: 'pointer' }} onClick={() => onOpen(t.id)}>
-        <div style={{ fontSize: 13.5, color: t.done ? 'var(--text-3)' : 'var(--text)', textDecoration: t.done ? 'line-through' : 'none', fontWeight: 500, lineHeight: 1.35 }}>
+        <div style={{ fontSize: 13.5, color: t.done ? 'var(--text-3)' : 'var(--text)', textDecoration: t.done ? 'line-through' : 'none', fontWeight: 500, lineHeight: 1.35, overflowWrap: 'anywhere', }}>
           {t.title}
         </div>
         <div style={{ fontSize: 11.5, color: 'var(--text-3)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
@@ -64,11 +68,13 @@ function EventRow({ e, last }: AnyProps) {
   const s = subjectById(e.subject)
 
   return (
-    <div style={{ display: 'flex', gap: 12, padding: '10px 0', borderBottom: last ? 'none' : '1px solid var(--border)' }}>
+    <div style={{
+      width: '100%', minWidth: 0, display: 'flex', gap: 12, padding: '10px 0', borderBottom: last ? 'none' : '1px solid var(--border)', overflow: 'hidden',
+    }}>
       <div style={{ minWidth: 46, fontSize: 12, color: 'var(--text-2)', fontWeight: 600, paddingTop: 1, fontFamily: 'var(--font-display)' }}>{e.time}</div>
       <div style={{ width: 3, borderRadius: 3, background: cVar(s.color), flexShrink: 0 }} />
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 13.5, color: 'var(--text)', fontWeight: 500 }}>{e.title}</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13.5, color: 'var(--text)', fontWeight: 500, overflowWrap: 'anywhere', }}>  {e.title}</div>
         <div style={{ fontSize: 11.5, color: 'var(--text-3)', marginTop: 2, display: 'flex', gap: 6, alignItems: 'center' }}>
           <Icon name={e.type === 'asesoria' ? 'globe' : 'mapPin'} size={12} />
           {e.loc} · {e.dur}
@@ -277,9 +283,15 @@ export function Dashboard({ m, go, tasks, onToggle, onOpenTask, variant = 'resum
   const enfoque = variant === 'enfoque'
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: m ? 16 : 20 }}>
+    <div
+      style={{
+        width: '100%', minWidth: 0, maxWidth: '100%', overflowX: 'clip', display: 'flex', flexDirection: 'column', gap: m ? 14 : 20,
+      }}
+    >
       <FadeIn>
-        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 }}>
+        <div
+          style={{ width: '100%', minWidth: 0, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', }}
+        >
           <div>
             <h1 style={{ fontSize: m ? 22 : 25, fontWeight: 600, color: 'var(--text)', letterSpacing: '-0.02em', fontFamily: 'var(--font-display)' }}>
               {greet}, {DATA.user.short.split(' ')[0]}
@@ -294,14 +306,34 @@ export function Dashboard({ m, go, tasks, onToggle, onOpenTask, variant = 'resum
         {enfoque ? (
           <HeroFocus m={m} onOpenTask={onOpenTask} go={go} />
         ) : (
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 11, padding: '13px 16px', borderRadius: 'var(--r-md)',
-            background: 'var(--primary-soft)', border: '1px solid color-mix(in oklch, var(--primary) 18%, transparent)',
-          }}>
+          <div
+            style={{
+              width: '100%',
+              minWidth: 0,
+              maxWidth: '100%',
+              display: 'flex',
+              alignItems: m ? 'flex-start' : 'center',
+              gap: 11,
+              padding: m ? '12px' : '13px 16px',
+              borderRadius: 'var(--r-md)',
+              background: 'var(--primary-soft)',
+              border: '1px solid color-mix(in oklch, var(--primary) 18%, transparent)',
+              overflow: 'hidden',
+            }}
+          >
             <span style={{ width: 34, height: 34, borderRadius: 'var(--r-sm)', background: 'var(--primary)', color: 'var(--on-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <Icon name="flag" size={17} stroke={2} />
             </span>
-            <div style={{ flex: 1, fontSize: 13, color: 'var(--primary-text)', lineHeight: 1.4 }}>
+            <div
+              style={{
+                flex: 1,
+                minWidth: 0,
+                fontSize: 13,
+                color: 'var(--primary-text)',
+                lineHeight: 1.4,
+                overflowWrap: 'anywhere',
+              }}
+            >
               <strong style={{ fontWeight: 600 }}>Entrega hoy:</strong> Proyecto de Bases de Datos · 11:59 p.m. — quedan <strong>3 horas</strong>.
             </div>
             {!m && <Button size="sm" variant="primary" onClick={() => onOpenTask('t1')}>Ver tarea</Button>}
@@ -310,15 +342,25 @@ export function Dashboard({ m, go, tasks, onToggle, onOpenTask, variant = 'resum
       </FadeIn>
 
       <FadeIn delay={120}>
-        <div style={{ display: 'grid', gridTemplateColumns: m ? '1fr 1fr' : 'repeat(4, 1fr)', gap: m ? 11 : 14 }}>
+        <div
+          style={{
+            width: '100%',
+            minWidth: 0,
+            display: 'grid',
+            gridTemplateColumns: m
+              ? 'repeat(2, minmax(0, 1fr))'
+              : 'repeat(4, minmax(0, 1fr))',
+            gap: m ? 10 : 14,
+          }}
+        >
           <MetricCard icon="tasks" color={1} label="Pendientes" value={pend} sub={`${altas} de alta prioridad`} onClick={() => go('tasks')} />
           <MetricCard icon="clock" color={2} label="Clases hoy" value="4" sub="Próxima en 1 h 20 m" onClick={() => go('schedule')} />
-          <MiniMapCard onClick={() => go('map')} />
+          {!m && <MiniMapCard onClick={() => go('map')} />}
           <MetricCard icon="flame" color={4} label="Racha" value={`${DATA.user.streak} d`} sub="¡Sigue así!" />
         </div>
       </FadeIn>
 
-      <div style={{ display: 'grid', gridTemplateColumns: m ? '1fr' : '1fr 1fr', gap: m ? 16 : 16 }}>
+      <div style={{ width: '100%', minWidth: 0, display: 'grid', gridTemplateColumns: m ? 'minmax(0, 1fr)' : 'repeat(2, minmax(0, 1fr))', gap: m ? 14 : 16, }}>
         <FadeIn delay={180}>
           <Card pad={m ? 16 : 18}>
             <SectionTitle action="Ver todas" onAction={() => go('tasks')}>Tareas próximas</SectionTitle>

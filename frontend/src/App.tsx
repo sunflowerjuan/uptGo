@@ -404,14 +404,16 @@ export default function App() {
         <main
           className="uptgo-main"
           style={{
-            padding: isMobile ? '14px' : '28px',
+            padding: isMobile ? '12px' : '28px',
+            minWidth: 0,
+            maxWidth: '100%',
+            overflowX: 'clip',
           }}
         >
           <div className={isMobile ? 'uptgo-mobile-content' : 'uptgo-content'}>
             {screen}
           </div>
         </main>
-
         {isMobile && !isError && (
           <BottomNav
             route={route}
