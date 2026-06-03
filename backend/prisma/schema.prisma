@@ -97,6 +97,7 @@ model UserSettings {
   userId                  String   @unique
   theme                   String   @default("light")
   language                String   @default("es")
+  palette                 String   @default("cobalto")
   notificationPreferences Json     @default("{}")
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
