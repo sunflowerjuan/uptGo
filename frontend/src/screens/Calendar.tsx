@@ -157,7 +157,6 @@ export function Calendar({ m, onAdd }: AnyProps) {
 
                 const today = day === 8
                 const selected = day === sel
-                const marks = DAY_MARKS[day] || []
 
                 return (
                   <button

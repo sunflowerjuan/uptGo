@@ -91,20 +91,30 @@ export function Card({
       onMouseLeave={() => setIsHover(false)}
       style={{
         background: 'var(--surface)',
-        border: '1px solid var(--border)',
+
+        borderWidth: 1,
+        borderStyle: 'solid',
+        borderColor:
+          hover && isHover
+            ? 'var(--border-strong)'
+            : 'var(--border)',
+
         borderRadius: 'var(--r-md)',
         padding: pad,
-        boxShadow: 'var(--shadow-sm)',
+        boxShadow:
+          hover && isHover
+            ? 'var(--shadow-md)'
+            : 'var(--shadow-sm)',
+
+        transform:
+          hover && isHover
+            ? 'translateY(-1px)'
+            : 'translateY(0)',
+
         transition:
           'border-color .18s var(--ease), box-shadow .18s var(--ease), transform .18s var(--ease)',
         cursor: onClick ? 'pointer' : 'default',
-        ...(hover && isHover
-          ? {
-            borderColor: 'var(--border-strong)',
-            boxShadow: 'var(--shadow-md)',
-            transform: 'translateY(-1px)',
-          }
-          : {}),
+
         ...style,
       }}
       {...rest}
