@@ -186,21 +186,74 @@ function QuickAddSheet({ open, onClose, toast }: QuickAddSheetProps) {
     ['bell', 'Recordatorio', 'Con notificación push', 5],
     ['calendar', 'Evento', 'En tu calendario', 3],
   ]
+
   return (
-    <Sheet open={open} onClose={onClose} title="Crear">
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 11 }}>
+    <Sheet open={open} onClose={onClose} title="Crear nuevo">
+      <div className="uptgo-sheet-grid">
         {opts.map(([ic, label, sub, c]) => (
-          <button key={label} onClick={() => { onClose(); toast(`Crear ${label.toLowerCase()}`); }} style={{
-            display: 'flex', flexDirection: 'column', gap: 8, padding: '18px 16px', textAlign: 'left',
-            background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', cursor: 'pointer',
-          }}>
-            <span style={{ width: 40, height: 40, borderRadius: 'var(--r-sm)', background: cSoftVar(c), color: cVar(c), display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name={ic} size={20} /></span>
-            <div><div style={{ fontSize: 14.5, fontWeight: 600, color: 'var(--text)' }}>{label}</div><div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>{sub}</div></div>
+          <button
+            key={label}
+            onClick={() => {
+              onClose()
+              toast(`Crear ${label.toLowerCase()}`)
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 12,
+              padding: '16px 14px',
+              textAlign: 'left',
+              background: 'var(--surface-2)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--r-md)',
+              cursor: 'pointer',
+              color: 'var(--text)',
+            }}
+          >
+            <span
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: 'var(--r-md)',
+                background: cSoftVar(c),
+                color: cVar(c),
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <Icon name={ic} size={18} />
+            </span>
+
+            <span style={{ minWidth: 0 }}>
+              <strong
+                style={{
+                  display: 'block',
+                  fontSize: 14,
+                  color: 'var(--text)',
+                  marginBottom: 3,
+                }}
+              >
+                {label}
+              </strong>
+
+              <span
+                style={{
+                  display: 'block',
+                  fontSize: 12.5,
+                  color: 'var(--text-2)',
+                  lineHeight: 1.35,
+                }}
+              >
+                {sub}
+              </span>
+            </span>
           </button>
         ))}
       </div>
     </Sheet>
-  );
+  )
 }
 
 const TWEAK_DEFAULTS: TweakValues = {
