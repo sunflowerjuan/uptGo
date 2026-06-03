@@ -1,17 +1,7 @@
 import React from 'react'
+import { useState } from 'react'
 import { DATA } from '../data/data'
-import {
-  Button,
-  Card,
-  EmptyState,
-  FadeIn,
-  IconButton,
-  Pill,
-  SectionTitle,
-  cSoftVar,
-  cVar,
-  subjectById,
-} from '../components/UI'
+import { Button, Card, EmptyState, FadeIn, IconButton, Pill, SectionTitle, cSoftVar, cVar, subjectById, } from '../components/UI'
 import { Icon } from '../components/Icons'
 type AnyProps = Record<string, any>
 
@@ -48,15 +38,48 @@ export function Calendar({ m, onAdd }: AnyProps) {
   const [sel, setSel] = React.useState(8)
   const [popupDay, setPopupDay] = React.useState<number | null>(null)
 
+  const [quickCreateOpen, setQuickCreateOpen] = React.useState(false)
+  const [selectedCreateDate, setSelectedCreateDate] = React.useState<string | null>(null)
+
+  const [createType, setCreateType] = React.useState<'evento' | 'clase' | 'tarea' | null>(null)
+  const [createTitle, setCreateTitle] = React.useState('')
+  const [createTime, setCreateTime] = React.useState('08:00')
+
   const year = 2026
   const month = 4
   const first = new Date(year, month, 1)
   const startDow = (first.getDay() + 6) % 7
   const daysInMonth = new Date(year, month + 1, 0).getDate()
+
+  const openCreateForm = (type: 'evento' | 'clase' | 'tarea') => {
+    setQuickCreateOpen(false)
+    setCreateType(type)
+    setCreateTitle('')
+    setCreateTime('08:00')
+  }
+
   const cells: Array<number | null> = [
     ...Array(startDow).fill(null),
     ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
   ]
+
+  const formatCreateDate = (day: number) => {
+    const mm = String(month + 1).padStart(2, '0')
+    const dd = String(day).padStart(2, '0')
+    return `${year}-${mm}-${dd}`
+  }
+
+  const openQuickCreate = (day: number) => {
+    setSel(day)
+    setPopupDay(null)
+    setSelectedCreateDate(formatCreateDate(day))
+    setQuickCreateOpen(true)
+  }
+
+  const closeQuickCreate = () => {
+    setQuickCreateOpen(false)
+    setSelectedCreateDate(null)
+  }
 
   const agendaDay = (day: number) => {
     const items: any[] = []
@@ -73,7 +96,9 @@ export function Calendar({ m, onAdd }: AnyProps) {
       }
 
       DAY_MARKS[day].forEach((color, index) => {
-        const subj = DATA.subjects.find((subject: any) => subject.color === color) || DATA.subjects[0]
+        const subj =
+          DATA.subjects.find((subject: any) => subject.color === color) ||
+          DATA.subjects[0]
 
         items.push({
           time: ['08:00', '10:00', '14:00'][index % 3],
@@ -87,20 +112,68 @@ export function Calendar({ m, onAdd }: AnyProps) {
 
     return items
   }
+
   const monthPreview = (day: number) => {
     return agendaDay(day).slice(0, m ? 1 : 2)
   }
 
+  const createOptions = [
+    {
+      type: 'evento' as const,
+      icon: 'calendar',
+      title: 'Crear evento',
+      sub: 'Agregar una actividad puntual a este día.',
+    },
+    {
+      type: 'clase' as const,
+      icon: 'clock',
+      title: 'Crear clase',
+      sub: 'Programar una clase o bloque académico.',
+    },
+    {
+      type: 'tarea' as const,
+      icon: 'tasks',
+      title: 'Crear tarea',
+      sub: 'Agregar una entrega o pendiente.',
+    },
+  ]
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <FadeIn>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            flexWrap: 'wrap',
+          }}
+        >
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            {m && <h1 style={{ fontSize: 22, fontWeight: 600, color: 'var(--text)', fontFamily: 'var(--font-display)', letterSpacing: '-0.02em' }}>Calendario</h1>}
+            {m && (
+              <h1
+                style={{
+                  fontSize: 22,
+                  fontWeight: 600,
+                  color: 'var(--text)',
+                  fontFamily: 'var(--font-display)',
+                  letterSpacing: '-0.02em',
+                }}
+              >
+                Calendario
+              </h1>
+            )}
           </div>
 
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <div style={{ display: 'flex', background: 'var(--surface-2)', borderRadius: 'var(--r-full)', padding: 3 }}>
+            <div
+              style={{
+                display: 'flex',
+                background: 'var(--surface-2)',
+                borderRadius: 'var(--r-full)',
+                padding: 3,
+              }}
+            >
               {(['mes', 'agenda'] as const).map((value) => (
                 <button
                   key={value}
@@ -124,14 +197,32 @@ export function Calendar({ m, onAdd }: AnyProps) {
               ))}
             </div>
 
-            {!m && <Button icon="plus" onClick={onAdd}>Nuevo evento</Button>}
+            {!m && (
+              <Button icon="plus" onClick={onAdd}>
+                Nuevo evento
+              </Button>
+            )}
           </div>
         </div>
       </FadeIn>
 
       <FadeIn delay={60}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <h2 style={{ fontSize: 17, fontWeight: 600, color: 'var(--text)', textTransform: 'capitalize', fontFamily: 'var(--font-display)' }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <h2
+            style={{
+              fontSize: 17,
+              fontWeight: 600,
+              color: 'var(--text)',
+              textTransform: 'capitalize',
+              fontFamily: 'var(--font-display)',
+            }}
+          >
             {MONTHS[month]} {year}
           </h2>
 
@@ -145,9 +236,24 @@ export function Calendar({ m, onAdd }: AnyProps) {
       {view === 'mes' && (
         <FadeIn delay={110}>
           <Card pad={m ? 10 : 16}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: m ? 2 : 6 }}>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
+                gap: m ? 2 : 6,
+              }}
+            >
               {DOW.map((day) => (
-                <div key={day} style={{ textAlign: 'center', fontSize: 11, fontWeight: 600, color: 'var(--text-3)', padding: '4px 0 8px' }}>
+                <div
+                  key={day}
+                  style={{
+                    textAlign: 'center',
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: 'var(--text-3)',
+                    padding: '4px 0 8px',
+                  }}
+                >
                   {m ? day[0] : day}
                 </div>
               ))}
@@ -157,6 +263,7 @@ export function Calendar({ m, onAdd }: AnyProps) {
 
                 const today = day === 8
                 const selected = day === sel
+                const preview = monthPreview(day)
 
                 return (
                   <button
@@ -164,19 +271,35 @@ export function Calendar({ m, onAdd }: AnyProps) {
                     onClick={() => {
                       setSel(day)
 
-                      if (view === 'mes' && agendaDay(day).length > 0) {
+                      if (agendaDay(day).length > 0) {
                         setPopupDay(day)
                       } else {
                         setPopupDay(null)
                       }
                     }}
+                    onDoubleClick={(event) => {
+                      event.preventDefault()
+                      event.stopPropagation()
+                      openQuickCreate(day)
+                    }}
+                    title="Doble click para agregar"
                     style={{
                       aspectRatio: '1',
                       minHeight: m ? 40 : 82,
                       borderRadius: 'var(--r-sm)',
                       cursor: 'pointer',
-                      border: '1px solid ' + (selected ? 'color-mix(in oklch, var(--primary) 70%, var(--border))' : today ? 'color-mix(in oklch, var(--primary) 35%, var(--border))' : 'transparent'),
-                      background: selected ? 'color-mix(in oklch, var(--primary) 14%, var(--surface))' : today ? 'color-mix(in oklch, var(--primary) 8%, var(--surface))' : 'transparent',
+                      border:
+                        '1px solid ' +
+                        (selected
+                          ? 'color-mix(in oklch, var(--primary) 70%, var(--border))'
+                          : today
+                            ? 'color-mix(in oklch, var(--primary) 35%, var(--border))'
+                            : 'transparent'),
+                      background: selected
+                        ? 'color-mix(in oklch, var(--primary) 14%, var(--surface))'
+                        : today
+                          ? 'color-mix(in oklch, var(--primary) 8%, var(--surface))'
+                          : 'transparent',
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
@@ -184,7 +307,7 @@ export function Calendar({ m, onAdd }: AnyProps) {
                       padding: m ? '6px 0' : '7px 0',
                       gap: 2,
                       overflow: 'hidden',
-                      transition: 'background .15s',
+                      transition: 'background .15s, border-color .15s',
                     }}
                   >
                     <div
@@ -200,15 +323,21 @@ export function Calendar({ m, onAdd }: AnyProps) {
                         style={{
                           fontSize: m ? 13 : 13.5,
                           fontWeight: today ? 700 : 500,
-                          color: selected || today ? 'var(--primary-text)' : 'var(--text)', fontFamily: 'var(--font-display)',
+                          color:
+                            selected || today
+                              ? 'var(--primary-text)'
+                              : 'var(--text)',
+                          fontFamily: 'var(--font-display)',
                         }}
                       >
                         {day}
                       </span>
                     </div>
 
-                    {monthPreview(day).length > 0 && (
+                    {preview.length > 0 && (
                       <div
+                        onClick={(event) => event.stopPropagation()}
+                        onDoubleClick={(event) => event.stopPropagation()}
                         style={{
                           width: '100%',
                           display: 'flex',
@@ -219,7 +348,7 @@ export function Calendar({ m, onAdd }: AnyProps) {
                           overflow: 'hidden',
                         }}
                       >
-                        {monthPreview(day).map((item: any, itemIndex: number) => (
+                        {preview.map((item: any, itemIndex: number) => (
                           <div
                             key={itemIndex}
                             style={{
@@ -229,7 +358,8 @@ export function Calendar({ m, onAdd }: AnyProps) {
                               background: selected
                                 ? 'color-mix(in oklch, var(--surface) 88%, var(--primary-soft))'
                                 : 'color-mix(in oklch, var(--surface) 94%, var(--bg-tint))',
-                              border: '1px solid color-mix(in oklch, var(--border) 75%, transparent)',
+                              border:
+                                '1px solid color-mix(in oklch, var(--border) 75%, transparent)',
                               display: 'flex',
                               alignItems: 'center',
                               gap: 5,
@@ -261,7 +391,7 @@ export function Calendar({ m, onAdd }: AnyProps) {
                                   lineHeight: 1,
                                 }}
                               >
-                                {item.title.slice(0,14)}
+                                {item.title.slice(0, 14)}
                               </span>
                             )}
                           </div>
@@ -275,6 +405,7 @@ export function Calendar({ m, onAdd }: AnyProps) {
           </Card>
         </FadeIn>
       )}
+
       {view === 'agenda' && (
         <FadeIn delay={110}>
           <Card pad={m ? 16 : 20}>
@@ -318,7 +449,7 @@ export function Calendar({ m, onAdd }: AnyProps) {
                       }}
                     />
 
-                    <div style={{ flex: 1 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
                       <div
                         style={{
                           fontSize: 13.5,
@@ -356,6 +487,7 @@ export function Calendar({ m, onAdd }: AnyProps) {
           </Card>
         </FadeIn>
       )}
+
       {view === 'mes' && popupDay && agendaDay(popupDay).length > 0 && (
         <div
           style={{
@@ -412,7 +544,8 @@ export function Calendar({ m, onAdd }: AnyProps) {
                     marginTop: 2,
                   }}
                 >
-                  {agendaDay(popupDay).length} actividad{agendaDay(popupDay).length === 1 ? '' : 'es'}
+                  {agendaDay(popupDay).length} actividad
+                  {agendaDay(popupDay).length === 1 ? '' : 'es'}
                 </div>
               </div>
 
@@ -443,7 +576,8 @@ export function Calendar({ m, onAdd }: AnyProps) {
                     display: 'flex',
                     gap: 12,
                     padding: '14px 0',
-                    borderBottom: index === arr.length - 1 ? 'none' : '1px solid var(--border)',
+                    borderBottom:
+                      index === arr.length - 1 ? 'none' : '1px solid var(--border)',
                   }}
                 >
                   <div
@@ -500,10 +634,159 @@ export function Calendar({ m, onAdd }: AnyProps) {
         </div>
       )}
 
+      {quickCreateOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 100,
+            background: 'oklch(0 0 0 / 0.22)',
+            display: 'flex',
+            alignItems: m ? 'flex-end' : 'center',
+            justifyContent: 'center',
+            padding: m ? '0 14px 18px' : 20,
+          }}
+          onClick={closeQuickCreate}
+        >
+          <div
+            onClick={(event) => event.stopPropagation()}
+            style={{
+              width: m ? '100%' : 430,
+              maxWidth: '100%',
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: 22,
+              boxShadow: 'var(--shadow-pop)',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                padding: '18px 20px 14px',
+                borderBottom: '1px solid var(--border)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 10,
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    fontSize: 15,
+                    fontWeight: 700,
+                    color: 'var(--text)',
+                    fontFamily: 'var(--font-display)',
+                  }}
+                >
+                  Agregar al calendario
+                </div>
+
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: 'var(--text-3)',
+                    marginTop: 2,
+                  }}
+                >
+                  Fecha seleccionada: {selectedCreateDate}
+                </div>
+              </div>
+
+              <button
+                onClick={closeQuickCreate}
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 'var(--r-full)',
+                  border: '1px solid var(--border)',
+                  background: 'var(--surface)',
+                  color: 'var(--text-2)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Icon name="x" size={15} />
+              </button>
+            </div>
+
+            <div
+              style={{
+                padding: 16,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 10,
+              }}
+            >
+              {createOptions.map((option) => (
+                <button
+                  key={option.title}
+                  onClick={() => openCreateForm(option.type)}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    padding: '14px',
+                    borderRadius: 'var(--r-md)',
+                    border: '1px solid var(--border)',
+                    background: 'var(--surface-2)',
+                    color: 'var(--text)',
+                    fontFamily: 'var(--font-ui)',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 38,
+                      height: 38,
+                      borderRadius: 'var(--r-sm)',
+                      background: 'var(--primary-soft)',
+                      color: 'var(--primary-text)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Icon name={option.icon} size={18} />
+                  </span>
+
+                  <span style={{ minWidth: 0 }}>
+                    <strong
+                      style={{
+                        display: 'block',
+                        fontSize: 14,
+                        color: 'var(--text)',
+                      }}
+                    >
+                      {option.title}
+                    </strong>
+
+                    <span
+                      style={{
+                        display: 'block',
+                        fontSize: 12,
+                        color: 'var(--text-3)',
+                        marginTop: 3,
+                        lineHeight: 1.35,
+                      }}
+                    >
+                      {option.sub}
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
-
 export function Schedule({ m, onAdd, toast }: AnyProps) {
   const days = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie']
   const hours = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
