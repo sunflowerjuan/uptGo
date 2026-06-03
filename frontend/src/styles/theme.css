@@ -163,3 +163,38 @@
   --warn:   oklch(0.8 0.13 70);  --warn-soft: oklch(0.38 0.06 65);
   --ok:     oklch(0.74 0.14 145); --ok-soft: oklch(0.36 0.06 145);
 }
+
+html,
+body,
+#root {
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  overflow-x: hidden;
+  background: var(--bg);
+}
+
+.uptgo-root {
+  width: 100%;
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* Desktop */
+@media (min-width: 821px) {
+  .uptgo-root {
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+/* Mobile real */
+@media (max-width: 820px) {
+  .uptgo-root {
+    min-height: 100dvh;
+  }
+}

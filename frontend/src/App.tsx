@@ -4,14 +4,7 @@ import { Icon } from './components/Icons'
 import { Logo } from './components/Logo'
 import { Sheet, EmptyState, cSoftVar, cVar } from './components/UI'
 import { TopBar, Sidebar, BottomNav, MenuSheet } from './components/Nav'
-import {
-  TweaksPanel,
-  TweakSection,
-  TweakRadio,
-  TweakToggle,
-  TweakColor,
-  useTweaks,
-} from './components/TweaksPanel'
+import { useTweaks } from './components/TweaksPanel'
 
 import { Login, ErrorScreen } from './screens/Auth'
 import { Dashboard } from './screens/Dashboard'
@@ -44,7 +37,6 @@ type TweakValues = {
   palette: 'verde' | 'cobalto' | 'arcilla'
   dark: boolean
   navStyle: 'sidebar' | 'rail' | 'top'
-  device: 'mobile' | 'desktop'
   homeVariant: 'resumen' | 'enfoque'
   online: boolean
 }
@@ -78,6 +70,32 @@ type QuickAddSheetProps = {
   open: boolean
   onClose: () => void
   toast: (msg: string) => void
+}
+
+function useIsMobile(breakpoint = 820) {
+  const getValue = () => {
+    if (typeof window === 'undefined') return false
+    return window.matchMedia(`(max-width: ${breakpoint}px)`).matches
+  }
+
+  const [isMobile, setIsMobile] = useState(getValue)
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia(`(max-width: ${breakpoint}px)`)
+
+    const handleChange = (event: MediaQueryListEvent) => {
+      setIsMobile(event.matches)
+    }
+
+    setIsMobile(mediaQuery.matches)
+    mediaQuery.addEventListener('change', handleChange)
+
+    return () => {
+      mediaQuery.removeEventListener('change', handleChange)
+    }
+  }, [breakpoint])
+
+  return isMobile
 }
 
 function StatusBar({ online }: StatusBarProps) {
@@ -189,7 +207,6 @@ const TWEAK_DEFAULTS: TweakValues = {
   palette: 'verde',
   dark: false,
   navStyle: 'sidebar',
-  device: 'mobile',
   homeVariant: 'resumen',
   online: true,
 }
@@ -197,7 +214,7 @@ const TWEAK_DEFAULTS: TweakValues = {
 export default function App() {
   const [t, setTweak] = useTweaks<TweakValues>(TWEAK_DEFAULTS)
   const theme = t.dark ? 'dark' : 'light';
-  const isMobile = t.device === 'mobile';
+  const isMobile = useIsMobile()
   window.__UPTGO_MOBILE__ = isMobile;
 
   const [authed, setAuthed] = useState(() => localStorage.getItem('uptgo_auth') === '1');
@@ -333,23 +350,6 @@ export default function App() {
     <div className="uptgo-root" data-palette={t.palette} data-theme={theme}
       style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg-tint)', color: 'var(--text)', fontFamily: 'var(--font-ui)' }}>
       {/* workspace toolbar */}
-      <div style={{ height: 46, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, borderBottom: '1px solid var(--border)', background: 'var(--surface)', position: 'relative' }}>
-        <span style={{ position: 'absolute', left: 18, display: 'flex', alignItems: 'center', gap: 8 }}><Logo variant="mark" size={22} /><span style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 14, color: 'var(--text-2)' }}>Prototipo</span></span>
-        <div style={{ display: 'flex', gap: 4, background: 'var(--surface-2)', borderRadius: 'var(--r-full)', padding: 3 }}>
-          {[
-            ['mobile', 'Móvil', 'user'],
-            ['desktop', 'Escritorio', 'grid'],
-          ].map(([id, label, ic]) => (
-            <button
-              key={id}
-              onClick={() => setTweak('device', id as TweakValues['device'])} style={{
-                display: 'inline-flex', alignItems: 'center', gap: 7, padding: '6px 15px', borderRadius: 'var(--r-full)', border: 'none', cursor: 'pointer',
-                background: t.device === id ? 'var(--surface)' : 'transparent', boxShadow: t.device === id ? 'var(--shadow-sm)' : 'none',
-                color: t.device === id ? 'var(--text)' : 'var(--text-3)', fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: t.device === id ? 600 : 500,
-              }}><Icon name={id === 'mobile' ? 'user' : 'grid'} size={14} />{label}</button>
-          ))}
-        </div>
-      </div>
 
       {/* stage */}
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: isMobile ? '20px' : '0' }}>
@@ -364,59 +364,6 @@ export default function App() {
           <div style={{ width: '100%', height: '100%', overflow: 'hidden', position: 'relative' }}>{appInner}</div>
         )}
       </div>
-
-      <TweaksPanel title="Tweaks">
-        <TweakSection label="Vista" />
-        <TweakRadio
-          label="Dispositivo"
-          value={t.device}
-          options={['mobile', 'desktop']}
-          onChange={(v) => setTweak('device', v as TweakValues['device'])}
-        />
-        <TweakToggle label="Modo oscuro" value={t.dark} onChange={(v) => setTweak('dark', v)} />
-        <TweakSection label="Identidad visual" />
-        <TweakColor
-          label="Paleta"
-          value={
-            {
-              verde: 'oklch(0.52 0.125 142)',
-              cobalto: 'oklch(0.52 0.16 258)',
-              arcilla: 'oklch(0.58 0.135 45)',
-            }[t.palette]
-          }
-          options={[
-            'oklch(0.52 0.125 142)',
-            'oklch(0.52 0.16 258)',
-            'oklch(0.58 0.135 45)',
-          ]}
-          onChange={(value) => {
-            const paletteMap: Record<string, TweakValues['palette']> = {
-              'oklch(0.52 0.125 142)': 'verde',
-              'oklch(0.52 0.16 258)': 'cobalto',
-              'oklch(0.58 0.135 45)': 'arcilla',
-            }
-
-            const selectedPalette = paletteMap[String(value)] || 'verde'
-            setTweak('palette', selectedPalette)
-          }}
-        />
-        <TweakSection label="Navegación (escritorio)" />
-        <TweakRadio
-          label="Estilo"
-          value={t.navStyle}
-          options={['sidebar', 'rail', 'top']}
-          onChange={(v) => setTweak('navStyle', v as TweakValues['navStyle'])}
-        />
-        <TweakSection label="Pantalla de inicio" />
-        <TweakRadio
-          label="Variante"
-          value={t.homeVariant}
-          options={['resumen', 'enfoque']}
-          onChange={(v) => setTweak('homeVariant', v as TweakValues['homeVariant'])}
-        />
-        <TweakSection label="Estado de red" />
-        <TweakToggle label="Simular sin conexión" value={!t.online} onChange={(v) => setTweak('online', !v)} />
-      </TweaksPanel>
     </div>
   );
 }

@@ -165,7 +165,7 @@ export function Calendar({ m, onAdd }: AnyProps) {
                     onClick={() => {
                       setSel(day)
 
-                      if (agendaDay(day).length > 0) {
+                      if (view === 'mes' && agendaDay(day).length > 0) {
                         setPopupDay(day)
                       } else {
                         setPopupDay(null)
@@ -173,11 +173,11 @@ export function Calendar({ m, onAdd }: AnyProps) {
                     }}
                     style={{
                       aspectRatio: '1',
-                      minHeight: m ? 40 : 72,
+                      minHeight: m ? 40 : 82,
                       borderRadius: 'var(--r-sm)',
                       cursor: 'pointer',
-                      border: '1px solid ' + (selected ? 'var(--primary)' : today ? 'var(--primary-soft)' : 'transparent'),
-                      background: selected ? 'var(--primary-soft)' : today ? 'color-mix(in oklch, var(--primary) 10%, var(--surface))' : 'transparent',
+                      border: '1px solid ' + (selected ? 'color-mix(in oklch, var(--primary) 70%, var(--border))' : today ? 'color-mix(in oklch, var(--primary) 35%, var(--border))' : 'transparent'),
+                      background: selected ? 'color-mix(in oklch, var(--primary) 14%, var(--surface))' : today ? 'color-mix(in oklch, var(--primary) 8%, var(--surface))' : 'transparent',
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
@@ -221,29 +221,51 @@ export function Calendar({ m, onAdd }: AnyProps) {
                         }}
                       >
                         {monthPreview(day).map((item: any, itemIndex: number) => (
-                          <span
+                          <div
                             key={itemIndex}
                             style={{
                               width: '100%',
-                              minHeight: m ? 5 : 14,
-                              borderRadius: 6,
-                              background: cSoftVar(item.color),
-                              color: cVar(item.color),
-                              borderLeft: m ? 'none' : `2px solid ${cVar(item.color)}`,
+                              minHeight: m ? 4 : 16,
+                              borderRadius: 8,
+                              background: selected
+                                ? 'color-mix(in oklch, var(--surface) 88%, var(--primary-soft))'
+                                : 'color-mix(in oklch, var(--surface) 94%, var(--bg-tint))',
+                              border: '1px solid color-mix(in oklch, var(--border) 75%, transparent)',
                               display: 'flex',
                               alignItems: 'center',
-                              padding: m ? 0 : '0 5px',
-                              fontSize: 9.5,
-                              fontWeight: 600,
-                              lineHeight: 1,
-                              whiteSpace: 'nowrap',
+                              gap: 5,
+                              padding: m ? '0 4px' : '0 6px',
                               overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              opacity: selected ? 1 : 0.86,
                             }}
                           >
-                            {!m && `${item.time} ${item.title}`}
-                          </span>
+                            {!m && (
+                              <span
+                                style={{
+                                  width: 6,
+                                  height: 6,
+                                  borderRadius: '50%',
+                                  background: cVar(item.color),
+                                  flexShrink: 0,
+                                }}
+                              />
+                            )}
+
+                            {!m && (
+                              <span
+                                style={{
+                                  fontSize: 9.5,
+                                  fontWeight: 500,
+                                  color: 'var(--text-2)',
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  lineHeight: 1,
+                                }}
+                              >
+                                {item.title.slice(0,14)}
+                              </span>
+                            )}
+                          </div>
                         ))}
                       </div>
                     )}
@@ -254,7 +276,88 @@ export function Calendar({ m, onAdd }: AnyProps) {
           </Card>
         </FadeIn>
       )}
-      {popupDay && agendaDay(popupDay).length > 0 && (
+      {view === 'agenda' && (
+        <FadeIn delay={110}>
+          <Card pad={m ? 16 : 20}>
+            <SectionTitle>
+              {sel === 8 ? 'Hoy · ' : ''}
+              {sel} de {MONTHS[month]}
+            </SectionTitle>
+
+            {agendaDay(sel).length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {agendaDay(sel).map((item: any, index: number, arr: any[]) => (
+                  <div
+                    key={index}
+                    style={{
+                      display: 'flex',
+                      gap: 13,
+                      padding: '11px 0',
+                      borderBottom:
+                        index === arr.length - 1 ? 'none' : '1px solid var(--border)',
+                    }}
+                  >
+                    <div
+                      style={{
+                        minWidth: 46,
+                        fontSize: 12.5,
+                        color: 'var(--text-2)',
+                        fontWeight: 600,
+                        fontFamily: 'var(--font-display)',
+                        paddingTop: 1,
+                      }}
+                    >
+                      {item.time}
+                    </div>
+
+                    <div
+                      style={{
+                        width: 3,
+                        borderRadius: 3,
+                        background: cVar(item.color),
+                        flexShrink: 0,
+                      }}
+                    />
+
+                    <div style={{ flex: 1 }}>
+                      <div
+                        style={{
+                          fontSize: 13.5,
+                          color: 'var(--text)',
+                          fontWeight: 500,
+                        }}
+                      >
+                        {item.title}
+                      </div>
+
+                      <div
+                        style={{
+                          fontSize: 11.5,
+                          color: 'var(--text-3)',
+                          marginTop: 2,
+                        }}
+                      >
+                        {item.sub}
+                      </div>
+                    </div>
+
+                    <Pill color="var(--text-2)" bg="var(--surface-2)">
+                      {item.type}
+                    </Pill>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                icon="calendar"
+                title="Día libre"
+                body="No hay actividades programadas."
+              />
+            )}
+          </Card>
+        </FadeIn>
+      )}
+      {view === 'mes' && popupDay && agendaDay(popupDay).length > 0 && (
         <div
           style={{
             position: 'fixed',
@@ -271,18 +374,18 @@ export function Calendar({ m, onAdd }: AnyProps) {
           <div
             onClick={(event) => event.stopPropagation()}
             style={{
-              width: m ? '100%' : 380,
+              width: m ? '100%' : 420,
               maxWidth: '100%',
               background: 'var(--surface)',
               border: '1px solid var(--border)',
-              borderRadius: 'var(--r-lg)',
+              borderRadius: 22,
               boxShadow: 'var(--shadow-pop)',
               overflow: 'hidden',
             }}
           >
             <div
               style={{
-                padding: '15px 16px',
+                padding: '18px 20px 14px',
                 borderBottom: '1px solid var(--border)',
                 display: 'flex',
                 alignItems: 'center',
@@ -333,14 +436,14 @@ export function Calendar({ m, onAdd }: AnyProps) {
               </button>
             </div>
 
-            <div style={{ padding: '6px 16px 12px' }}>
+            <div style={{ padding: '8px 20px 18px' }}>
               {agendaDay(popupDay).map((item: any, index: number, arr: any[]) => (
                 <div
                   key={index}
                   style={{
                     display: 'flex',
                     gap: 12,
-                    padding: '12px 0',
+                    padding: '14px 0',
                     borderBottom: index === arr.length - 1 ? 'none' : '1px solid var(--border)',
                   }}
                 >
@@ -369,7 +472,7 @@ export function Calendar({ m, onAdd }: AnyProps) {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div
                       style={{
-                        fontSize: 13.5,
+                        fontSize: 14,
                         color: 'var(--text)',
                         fontWeight: 600,
                       }}
