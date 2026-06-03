@@ -79,13 +79,14 @@ model PushSubscription {
 }
 
 model SyncMetadata {
-  id          String     @id @default(uuid())
-  userId      String     @unique
-  lastSyncAt  DateTime?
-  syncStatus  SyncStatus @default(IDLE)
-  syncVersion Int        @default(0)
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  id            String     @id @default(uuid())
+  userId        String     @unique
+  lastSyncAt    DateTime?
+  syncStatus    SyncStatus @default(IDLE)
+  syncVersion   Int        @default(0)
+  driveFolderId String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
