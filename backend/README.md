@@ -1,98 +1,192 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# UPTGO Backend
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Backend oficial de la plataforma UPTGO, desarrollado con **NestJS** sobre una arquitectura **Offline First**.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+El backend **no almacena** notas académicas, audios, fotografías, PDFs ni documentos multimedia — esos datos residen en IndexedDB en el dispositivo del usuario y se sincronizan opcionalmente con Google Drive.
 
-## Description
+El backend administra exclusivamente: autenticación, usuarios, notificaciones push, OAuth Google y metadatos de sincronización.
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+---
 
-## Project setup
+## Stack tecnológico
 
-```bash
-$ npm install
-```
+| Tecnología | Versión | Rol |
+|---|---|---|
+| Node.js | ≥20 | Runtime |
+| NestJS | ^11 | Framework principal |
+| TypeScript | ^5.7 | Lenguaje (modo estricto) |
+| PostgreSQL | 16 | Base de datos |
+| Prisma ORM | ^6 | Acceso a base de datos |
+| Swagger / OpenAPI | ^11 | Documentación de API |
+| Helmet | ^8 | Seguridad HTTP |
+| ThrottlerModule | ^6 | Rate limiting |
+| class-validator | ^0.14 | Validación de DTOs |
+| Docker | ≥24 | Entorno local de BD |
 
-## Compile and run the project
+---
 
-```bash
-# development
-$ npm run start
+## Requisitos previos
 
-# watch mode
-$ npm run start:dev
+- Node.js ≥ 20
+- Docker Desktop (para levantar PostgreSQL localmente)
+- npm ≥ 10
 
-# production mode
-$ npm run start:prod
-```
+---
 
-## Run tests
+## Instalación y configuración
 
 ```bash
-# unit tests
-$ npm run test
+# 1. Instalar dependencias
+npm install
 
-# e2e tests
-$ npm run test:e2e
+# 2. Copiar variables de entorno
+cp .env.example .env
+# Editar .env con los valores de tu entorno
 
-# test coverage
-$ npm run test:cov
+# 3. Levantar PostgreSQL con Docker
+docker compose up -d
+
+# 4. Ejecutar migraciones de Prisma
+npm run prisma:migrate
+
+# 5. Iniciar en modo desarrollo
+npm run start:dev
 ```
 
-## Deployment
+---
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+## Variables de entorno
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+| Variable | Descripción | Default |
+|---|---|---|
+| `DATABASE_URL` | Cadena de conexión PostgreSQL | — |
+| `PORT` | Puerto del servidor | `3000` |
+| `API_PREFIX` | Prefijo global de rutas | `api` |
+| `CORS_ORIGIN` | Origen permitido por CORS | `http://localhost:5173` |
+| `THROTTLE_TTL` | Ventana de rate limiting (ms) | `60000` |
+| `THROTTLE_LIMIT` | Máximo de requests por ventana | `100` |
+
+---
+
+## Comandos disponibles
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+npm run start:dev        # Modo desarrollo (hot reload)
+npm run start:prod       # Modo producción
+npm run build            # Compilar TypeScript
+npm run lint             # ESLint con auto-fix
+npm run test             # Unit tests
+npm run test:e2e         # Tests end-to-end
+npm run prisma:migrate   # Ejecutar migraciones
+npm run prisma:generate  # Regenerar Prisma Client
+npm run prisma:studio    # Abrir Prisma Studio (UI de BD)
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+---
 
-## Resources
+## Documentación de la API
 
-Check out a few resources that may come in handy when working with NestJS:
+Con el servidor corriendo, la documentación Swagger está disponible en:
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+```
+http://localhost:3000/api/docs
+```
 
-## Support
+---
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+## Estructura del proyecto
 
-## Stay in touch
+```
+backend/
+├── prisma/
+│   ├── schema.prisma          # Modelos de base de datos
+│   └── migrations/            # Historial de migraciones
+├── src/
+│   ├── main.ts                # Bootstrap (Swagger, Helmet, Pipes)
+│   ├── app.module.ts          # Módulo raíz
+│   ├── prisma/
+│   │   ├── prisma.module.ts   # Módulo global de Prisma
+│   │   └── prisma.service.ts  # Cliente Prisma con lifecycle
+│   ├── health/
+│   │   ├── health.module.ts
+│   │   └── health.controller.ts  # GET /api/health
+│   └── users/
+│       ├── dto/
+│       │   ├── create-user.dto.ts   # Validación de creación
+│       │   ├── update-user.dto.ts   # Validación de actualización
+│       │   └── user-response.dto.ts # Respuesta sin datos sensibles
+│       ├── users.controller.ts      # Endpoints REST
+│       ├── users.service.ts         # Lógica de negocio
+│       └── users.module.ts
+├── docker-compose.yml
+├── .env.example
+└── avances.md                 # Registro de cambios por fase
+```
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+---
 
-## License
+## Endpoints disponibles
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+### Health
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| `GET` | `/api/health` | Estado de la API y base de datos |
+
+### Users
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| `POST` | `/api/users` | Crear usuario |
+| `GET` | `/api/users` | Listar usuarios activos |
+| `GET` | `/api/users/:id` | Obtener usuario por ID |
+| `PATCH` | `/api/users/:id` | Actualizar perfil |
+| `DELETE` | `/api/users/:id` | Eliminar usuario (soft delete) |
+
+---
+
+## Modelo de datos
+
+```
+User
+  id           UUID (PK)
+  email        String (unique)
+  passwordHash String? (solo se llena en Fase 3 — Auth)
+  provider     AuthProvider (LOCAL | GOOGLE)
+  name         String
+  program      String?
+  semester     String?
+  initials     String?
+  profileData  Json?
+  deletedAt    DateTime? (soft delete)
+  createdAt    DateTime
+  updatedAt    DateTime
+```
+
+`passwordHash` nunca se expone en las respuestas de la API.
+
+---
+
+## Roadmap
+
+| Fase | Estado | Descripción |
+|---|---|---|
+| Fase 1 — Infraestructura | Completada | NestJS, Prisma, Docker, Swagger, Rate Limiting |
+| Fase 2 — Usuarios | Completada | CRUD, perfil, soft delete |
+| Fase 3 — Auth | Pendiente | Registro, Login, JWT, Refresh Tokens |
+| Fase 4 — Google OAuth | Pendiente | Login con Google, OAuth 2.0 |
+| Fase 5 — Push Notifications | Pendiente | Web Push, suscripciones |
+| Fase 6 — Sincronización | Pendiente | Google Drive, Sync Metadata |
+
+---
+
+## Flujo Git
+
+```bash
+git checkout develop && git pull origin develop
+git checkout -b feature/nombre-feature
+
+# Al finalizar
+git push origin feature/nombre-feature
+# Abrir Pull Request: feature/* → develop
+```
