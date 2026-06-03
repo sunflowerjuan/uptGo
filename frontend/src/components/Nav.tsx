@@ -104,35 +104,32 @@ export const navItem = (id: string): NavItem | undefined =>
   ALL_NAV.find((item) => item.id === id)
 
 /* ---------------- DESKTOP SIDEBAR / RAIL ---------------- */
-
-export function Sidebar({
-  route,
-  go,
-  rail = false,
-  user,
-  onPomodoro,
-}: SidebarProps) {
+export function Sidebar({ route, go, rail = false, user, onPomodoro }: SidebarProps) {
   const [hovId, setHovId] = React.useState<string | null>(null)
 
   return (
-    <nav
+    <aside
+      className="uptgo-sidebar"
       style={{
         width: rail ? 76 : 232,
+        height: '100dvh',
+        minHeight: '100dvh',
         flexShrink: 0,
         background: 'var(--surface)',
         borderRight: '1px solid var(--border)',
         display: 'flex',
         flexDirection: 'column',
-        padding: rail ? '14px 0' : '16px 0',
-        overflowY: 'auto',
+        overflow: 'hidden',
         transition: 'width .25s var(--ease)',
       }}
     >
       <div
         style={{
-          padding: rail ? '0 0 14px' : '0 20px 16px',
+          flexShrink: 0,
+          padding: rail ? '14px 0 14px' : '16px 20px 16px',
           display: 'flex',
           justifyContent: rail ? 'center' : 'flex-start',
+          background: 'var(--surface)',
         }}
       >
         <button
@@ -152,140 +149,176 @@ export function Sidebar({
         </button>
       </div>
 
-      {NAV_GROUPS.map((group, groupIndex) => (
-        <div key={group.label} style={{ marginBottom: 4 }}>
-          {!rail && (
-            <div
-              style={{
-                fontSize: 10.5,
-                fontWeight: 600,
-                letterSpacing: '0.08em',
-                color: 'var(--text-3)',
-                textTransform: 'uppercase',
-                padding: '12px 20px 5px',
-              }}
-            >
-              {group.label}
-            </div>
-          )}
-
-          {rail && groupIndex > 0 && (
-            <div
-              style={{
-                height: 1,
-                background: 'var(--border)',
-                margin: '8px 18px',
-              }}
-            />
-          )}
-
-          {group.items.map((item) => {
-            const active = route === item.id
-            const hover = hovId === item.id
-
-            return (
-              <button
-                key={item.id}
-                onClick={() => go(item.id)}
-                title={rail ? item.label : undefined}
-                onMouseEnter={() => setHovId(item.id)}
-                onMouseLeave={() => setHovId(null)}
+      <div
+        className="uptgo-sidebar-nav"
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          padding: rail ? '0 0 12px' : '0 0 12px',
+          scrollbarWidth: 'thin',
+        }}
+      >
+        {NAV_GROUPS.map((group, groupIndex) => (
+          <div key={group.label} style={{ marginBottom: 4 }}>
+            {!rail && (
+              <div
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 11,
-                  width: '100%',
-                  padding: rail ? '0' : '9px 20px',
-                  height: rail ? 48 : 'auto',
-                  justifyContent: rail ? 'center' : 'flex-start',
-                  background: active
-                    ? 'var(--primary-soft)'
-                    : hover
-                      ? 'var(--surface-2)'
-                      : 'transparent',
-                  border: 'none',
-                  borderLeft: rail
-                    ? 'none'
-                    : `2px solid ${active ? 'var(--primary)' : 'transparent'}`,
-                  color: active
-                    ? 'var(--primary-text)'
-                    : hover
-                      ? 'var(--text)'
-                      : 'var(--text-2)',
-                  fontFamily: 'var(--font-ui)',
-                  fontSize: 13.5,
-                  fontWeight: active ? 600 : 500,
-                  cursor: 'pointer',
-                  transition: 'background .14s, color .14s',
-                  position: 'relative',
+                  fontSize: 10.5,
+                  fontWeight: 600,
+                  letterSpacing: '0.08em',
+                  color: 'var(--text-3)',
+                  textTransform: 'uppercase',
+                  padding: '12px 20px 5px',
                 }}
               >
-                {rail && active && (
-                  <span
-                    style={{
-                      position: 'absolute',
-                      left: 0,
-                      top: 12,
-                      bottom: 12,
-                      width: 3,
-                      borderRadius: '0 3px 3px 0',
-                      background: 'var(--primary)',
-                    }}
-                  />
-                )}
+                {group.label}
+              </div>
+            )}
 
-                <span
+            {rail && groupIndex > 0 && (
+              <div
+                style={{
+                  height: 1,
+                  background: 'var(--border)',
+                  margin: '8px 18px',
+                }}
+              />
+            )}
+
+            {group.items.map((item) => {
+              const active = route === item.id
+              const hover = hovId === item.id
+
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => go(item.id)}
+                  title={rail ? item.label : undefined}
+                  onMouseEnter={() => setHovId(item.id)}
+                  onMouseLeave={() => setHovId(null)}
                   style={{
-                    display: 'inline-flex',
-                    ...(rail
-                      ? {
-                          width: 40,
-                          height: 40,
-                          borderRadius: 'var(--r-sm)',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          background: 'transparent',
-                        }
-                      : {}),
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 11,
+                    width: '100%',
+                    minWidth: 0,
+                    padding: rail ? '0' : '9px 20px',
+                    height: rail ? 48 : 'auto',
+                    justifyContent: rail ? 'center' : 'flex-start',
+                    background: active
+                      ? 'var(--primary-soft)'
+                      : hover
+                        ? 'var(--surface-2)'
+                        : 'transparent',
+                    border: 'none',
+                    borderLeft: rail
+                      ? 'none'
+                      : `2px solid ${active ? 'var(--primary)' : 'transparent'}`,
+                    color: active
+                      ? 'var(--primary-text)'
+                      : hover
+                        ? 'var(--text)'
+                        : 'var(--text-2)',
+                    fontFamily: 'var(--font-ui)',
+                    fontSize: 13.5,
+                    fontWeight: active ? 600 : 500,
+                    cursor: 'pointer',
+                    transition: 'background .14s, color .14s',
+                    position: 'relative',
                   }}
                 >
-                  <Icon
-                    name={item.icon}
-                    size={rail ? 20 : 18}
-                    stroke={active ? 2 : 1.8}
-                  />
-                </span>
+                  {rail && active && (
+                    <span
+                      style={{
+                        position: 'absolute',
+                        left: 0,
+                        top: 12,
+                        bottom: 12,
+                        width: 3,
+                        borderRadius: '0 3px 3px 0',
+                        background: 'var(--primary)',
+                      }}
+                    />
+                  )}
 
-                {!rail && item.label}
-              </button>
-            )
-          })}
-        </div>
-      ))}
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      flexShrink: 0,
+                      ...(rail
+                        ? {
+                            width: 40,
+                            height: 40,
+                            borderRadius: 'var(--r-sm)',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            background: 'transparent',
+                          }
+                        : {}),
+                    }}
+                  >
+                    <Icon
+                      name={item.icon}
+                      size={rail ? 20 : 18}
+                      stroke={active ? 2 : 1.8}
+                    />
+                  </span>
 
-      <div style={{ marginTop: 'auto', padding: rail ? '12px 0 0' : '12px 14px 0' }}>
+                  {!rail && (
+                    <span
+                      style={{
+                        minWidth: 0,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {item.label}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        ))}
+      </div>
+
+      <div
+        className="uptgo-sidebar-footer"
+        style={{
+          flexShrink: 0,
+          marginTop: 'auto',
+          padding: rail ? '12px 0 14px' : '14px',
+          borderTop: '1px solid var(--border)',
+          background: 'var(--surface)',
+          boxShadow: '0 -8px 20px var(--shadow-color)',
+        }}
+      >
         <button
           onClick={onPomodoro}
           title="Temporizador Pomodoro"
           style={{
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            gap: 8,
+            justifyContent: rail ? 'center' : 'flex-start',
+            gap: 10,
             width: rail ? 48 : '100%',
-            height: 44,
+            height: rail ? 48 : 46,
             margin: rail ? '0 auto' : 0,
+            padding: rail ? 0 : '0 14px',
             background: 'var(--bg-tint)',
             color: 'var(--text-2)',
             border: '1px solid var(--border)',
-            borderRadius: 'var(--r-sm)',
+            borderRadius: 'var(--r-md)',
             cursor: 'pointer',
             fontFamily: 'var(--font-ui)',
-            fontSize: 13,
-            fontWeight: 500,
+            fontSize: 14,
+            fontWeight: 600,
           }}
         >
-          <Icon name="timer" size={17} />
+          <Icon name="timer" size={18} />
           {!rail && 'Pomodoro'}
         </button>
 
@@ -294,18 +327,18 @@ export function Sidebar({
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: 10,
-              padding: '14px 6px 4px',
+              gap: 11,
+              padding: '14px 4px 2px',
               marginTop: 10,
-              borderTop: '1px solid var(--border)',
             }}
           >
-            <Avatar initials={user.initials} size={34} />
-            <div style={{ minWidth: 0 }}>
+            <Avatar initials={user.initials} size={42} />
+
+            <div style={{ minWidth: 0, flex: 1 }}>
               <div
                 style={{
-                  fontSize: 13,
-                  fontWeight: 600,
+                  fontSize: 14,
+                  fontWeight: 700,
                   color: 'var(--text)',
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
@@ -314,17 +347,26 @@ export function Sidebar({
               >
                 {user.short}
               </div>
-              <div style={{ fontSize: 11, color: 'var(--text-3)' }}>
+
+              <div
+                style={{
+                  fontSize: 12,
+                  color: 'var(--text-3)',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  marginTop: 2,
+                }}
+              >
                 {user.program}
               </div>
             </div>
           </div>
         )}
       </div>
-    </nav>
+    </aside>
   )
 }
-
 /* ---------------- DESKTOP TOP TABS ---------------- */
 
 export function TopTabs({ route, go }: TopTabsProps) {
@@ -600,7 +642,7 @@ const BOTTOM_ITEMS = ['dashboard', 'tasks', '__fab', 'calendar', 'notes']
 
 export function BottomNav({ route, go, onAdd }: BottomNavProps) {
   return (
-    <nav
+    <nav className="uptgo-bottom-nav"
       style={{
         flexShrink: 0,
         background: 'color-mix(in oklch, var(--surface) 92%, transparent)',
@@ -610,7 +652,6 @@ export function BottomNav({ route, go, onAdd }: BottomNavProps) {
         gridTemplateColumns: 'repeat(5, 1fr)',
         alignItems: 'center',
         padding: '6px 8px calc(6px + env(safe-area-inset-bottom))',
-        position: 'relative',
         zIndex: 20,
       }}
     >

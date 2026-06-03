@@ -157,7 +157,6 @@ export function Calendar({ m, onAdd }: AnyProps) {
 
                 const today = day === 8
                 const selected = day === sel
-                const marks = DAY_MARKS[day] || []
 
                 return (
                   <button
@@ -165,7 +164,7 @@ export function Calendar({ m, onAdd }: AnyProps) {
                     onClick={() => {
                       setSel(day)
 
-                      if (agendaDay(day).length > 0) {
+                      if (view === 'mes' && agendaDay(day).length > 0) {
                         setPopupDay(day)
                       } else {
                         setPopupDay(null)
@@ -173,11 +172,11 @@ export function Calendar({ m, onAdd }: AnyProps) {
                     }}
                     style={{
                       aspectRatio: '1',
-                      minHeight: m ? 40 : 72,
+                      minHeight: m ? 40 : 82,
                       borderRadius: 'var(--r-sm)',
                       cursor: 'pointer',
-                      border: '1px solid ' + (selected ? 'var(--primary)' : today ? 'var(--primary-soft)' : 'transparent'),
-                      background: selected ? 'var(--primary-soft)' : today ? 'color-mix(in oklch, var(--primary) 10%, var(--surface))' : 'transparent',
+                      border: '1px solid ' + (selected ? 'color-mix(in oklch, var(--primary) 70%, var(--border))' : today ? 'color-mix(in oklch, var(--primary) 35%, var(--border))' : 'transparent'),
+                      background: selected ? 'color-mix(in oklch, var(--primary) 14%, var(--surface))' : today ? 'color-mix(in oklch, var(--primary) 8%, var(--surface))' : 'transparent',
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
@@ -221,29 +220,51 @@ export function Calendar({ m, onAdd }: AnyProps) {
                         }}
                       >
                         {monthPreview(day).map((item: any, itemIndex: number) => (
-                          <span
+                          <div
                             key={itemIndex}
                             style={{
                               width: '100%',
-                              minHeight: m ? 5 : 14,
-                              borderRadius: 6,
-                              background: cSoftVar(item.color),
-                              color: cVar(item.color),
-                              borderLeft: m ? 'none' : `2px solid ${cVar(item.color)}`,
+                              minHeight: m ? 4 : 16,
+                              borderRadius: 8,
+                              background: selected
+                                ? 'color-mix(in oklch, var(--surface) 88%, var(--primary-soft))'
+                                : 'color-mix(in oklch, var(--surface) 94%, var(--bg-tint))',
+                              border: '1px solid color-mix(in oklch, var(--border) 75%, transparent)',
                               display: 'flex',
                               alignItems: 'center',
-                              padding: m ? 0 : '0 5px',
-                              fontSize: 9.5,
-                              fontWeight: 600,
-                              lineHeight: 1,
-                              whiteSpace: 'nowrap',
+                              gap: 5,
+                              padding: m ? '0 4px' : '0 6px',
                               overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              opacity: selected ? 1 : 0.86,
                             }}
                           >
-                            {!m && `${item.time} ${item.title}`}
-                          </span>
+                            {!m && (
+                              <span
+                                style={{
+                                  width: 6,
+                                  height: 6,
+                                  borderRadius: '50%',
+                                  background: cVar(item.color),
+                                  flexShrink: 0,
+                                }}
+                              />
+                            )}
+
+                            {!m && (
+                              <span
+                                style={{
+                                  fontSize: 9.5,
+                                  fontWeight: 500,
+                                  color: 'var(--text-2)',
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  lineHeight: 1,
+                                }}
+                              >
+                                {item.title.slice(0,14)}
+                              </span>
+                            )}
+                          </div>
                         ))}
                       </div>
                     )}
@@ -254,7 +275,88 @@ export function Calendar({ m, onAdd }: AnyProps) {
           </Card>
         </FadeIn>
       )}
-      {popupDay && agendaDay(popupDay).length > 0 && (
+      {view === 'agenda' && (
+        <FadeIn delay={110}>
+          <Card pad={m ? 16 : 20}>
+            <SectionTitle>
+              {sel === 8 ? 'Hoy · ' : ''}
+              {sel} de {MONTHS[month]}
+            </SectionTitle>
+
+            {agendaDay(sel).length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {agendaDay(sel).map((item: any, index: number, arr: any[]) => (
+                  <div
+                    key={index}
+                    style={{
+                      display: 'flex',
+                      gap: 13,
+                      padding: '11px 0',
+                      borderBottom:
+                        index === arr.length - 1 ? 'none' : '1px solid var(--border)',
+                    }}
+                  >
+                    <div
+                      style={{
+                        minWidth: 46,
+                        fontSize: 12.5,
+                        color: 'var(--text-2)',
+                        fontWeight: 600,
+                        fontFamily: 'var(--font-display)',
+                        paddingTop: 1,
+                      }}
+                    >
+                      {item.time}
+                    </div>
+
+                    <div
+                      style={{
+                        width: 3,
+                        borderRadius: 3,
+                        background: cVar(item.color),
+                        flexShrink: 0,
+                      }}
+                    />
+
+                    <div style={{ flex: 1 }}>
+                      <div
+                        style={{
+                          fontSize: 13.5,
+                          color: 'var(--text)',
+                          fontWeight: 500,
+                        }}
+                      >
+                        {item.title}
+                      </div>
+
+                      <div
+                        style={{
+                          fontSize: 11.5,
+                          color: 'var(--text-3)',
+                          marginTop: 2,
+                        }}
+                      >
+                        {item.sub}
+                      </div>
+                    </div>
+
+                    <Pill color="var(--text-2)" bg="var(--surface-2)">
+                      {item.type}
+                    </Pill>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                icon="calendar"
+                title="Día libre"
+                body="No hay actividades programadas."
+              />
+            )}
+          </Card>
+        </FadeIn>
+      )}
+      {view === 'mes' && popupDay && agendaDay(popupDay).length > 0 && (
         <div
           style={{
             position: 'fixed',
@@ -271,18 +373,18 @@ export function Calendar({ m, onAdd }: AnyProps) {
           <div
             onClick={(event) => event.stopPropagation()}
             style={{
-              width: m ? '100%' : 380,
+              width: m ? '100%' : 420,
               maxWidth: '100%',
               background: 'var(--surface)',
               border: '1px solid var(--border)',
-              borderRadius: 'var(--r-lg)',
+              borderRadius: 22,
               boxShadow: 'var(--shadow-pop)',
               overflow: 'hidden',
             }}
           >
             <div
               style={{
-                padding: '15px 16px',
+                padding: '18px 20px 14px',
                 borderBottom: '1px solid var(--border)',
                 display: 'flex',
                 alignItems: 'center',
@@ -333,14 +435,14 @@ export function Calendar({ m, onAdd }: AnyProps) {
               </button>
             </div>
 
-            <div style={{ padding: '6px 16px 12px' }}>
+            <div style={{ padding: '8px 20px 18px' }}>
               {agendaDay(popupDay).map((item: any, index: number, arr: any[]) => (
                 <div
                   key={index}
                   style={{
                     display: 'flex',
                     gap: 12,
-                    padding: '12px 0',
+                    padding: '14px 0',
                     borderBottom: index === arr.length - 1 ? 'none' : '1px solid var(--border)',
                   }}
                 >
@@ -369,7 +471,7 @@ export function Calendar({ m, onAdd }: AnyProps) {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div
                       style={{
-                        fontSize: 13.5,
+                        fontSize: 14,
                         color: 'var(--text)',
                         fontWeight: 600,
                       }}
@@ -405,42 +507,89 @@ export function Calendar({ m, onAdd }: AnyProps) {
 export function Schedule({ m, onAdd, toast }: AnyProps) {
   const days = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie']
   const hours = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
-  const rowH = 46
-  const headH = 36
-  const [dayIdx, setDayIdx] = React.useState(0)
-  const shownDays = m ? [dayIdx] : [0, 1, 2, 3, 4]
+  const rowH = m ? 44 : 52
+  const headH = m ? 34 : 40
 
+  const [dayIdx, setDayIdx] = React.useState(0)
+
+  const shownDays = m ? [dayIdx] : [0, 1, 2, 3, 4]
+  const gridWidth = m ? '100%' : 820
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <FadeIn>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-          <div>
-            {m && <h1 style={{ fontSize: 22, fontWeight: 600, color: 'var(--text)', fontFamily: 'var(--font-display)', letterSpacing: '-0.02em' }}>Horario</h1>}
-            <p style={{ fontSize: 13, color: 'var(--text-3)', marginTop: m ? 3 : 0 }}>Semana típica · 6 materias · 18 créditos</p>
+    <FadeIn>
+      <div
+        className="uptgo-screen"
+        style={{
+          width: '100%',
+          minWidth: 0,
+        }}
+      >
+        {m && (
+          <div style={{ marginBottom: 18 }}>
+            <h1
+              style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: 24,
+                lineHeight: 1.1,
+                color: 'var(--text)',
+                marginBottom: 8,
+              }}
+            >
+              Horario
+            </h1>
+
+            <p
+              style={{
+                fontSize: 13,
+                color: 'var(--text-2)',
+              }}
+            >
+              Semana típica · 6 materias · 18 créditos
+            </p>
           </div>
+        )}
 
-          {!m && <Button icon="plus" onClick={onAdd}>Agregar clase</Button>}
-        </div>
-      </FadeIn>
+        {!m && (
+          <SectionTitle
+            title="Horario"
+            subtitle="Semana típica · 6 materias · 18 créditos"
+            action={
+              <Button size="sm" onClick={onAdd}>
+                Agregar clase
+              </Button>
+            }
+          />
+        )}
 
-      {m && (
-        <FadeIn delay={50}>
-          <div style={{ display: 'flex', gap: 7 }}>
+        {m && (
+          <div
+            className="schedule-day-tabs"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
+              gap: 7,
+              width: '100%',
+              marginBottom: 14,
+            }}
+          >
             {days.map((day, index) => (
               <button
                 key={day}
                 onClick={() => setDayIdx(index)}
                 style={{
-                  flex: 1,
+                  minWidth: 0,
                   padding: '9px 0',
                   borderRadius: 'var(--r-sm)',
-                  border: '1px solid ' + (dayIdx === index ? 'transparent' : 'var(--border)'),
-                  background: dayIdx === index ? 'var(--primary)' : 'var(--surface)',
-                  color: dayIdx === index ? 'var(--on-primary)' : 'var(--text-2)',
+                  border:
+                    '1px solid ' +
+                    (dayIdx === index ? 'transparent' : 'var(--border)'),
+                  background:
+                    dayIdx === index ? 'var(--primary)' : 'var(--surface)',
+                  color:
+                    dayIdx === index ? 'var(--on-primary)' : 'var(--text-2)',
                   fontFamily: 'var(--font-ui)',
-                  fontSize: 13,
-                  fontWeight: 600,
+                  fontSize: 12.5,
+                  fontWeight: 700,
                   cursor: 'pointer',
                 }}
               >
@@ -448,87 +597,227 @@ export function Schedule({ m, onAdd, toast }: AnyProps) {
               </button>
             ))}
           </div>
-        </FadeIn>
-      )}
+        )}
 
-      <FadeIn delay={110}>
-        <Card pad={m ? 10 : 16} style={{ overflowX: 'auto' }}>
-          <div style={{ display: 'flex', minWidth: m ? 'auto' : 620 }}>
-            <div style={{ width: 44, flexShrink: 0, paddingTop: headH }}>
-              {hours.map((hour) => (
-                <div key={hour} style={{ height: rowH, fontSize: 10.5, color: 'var(--text-3)', textAlign: 'right', paddingRight: 8, transform: 'translateY(-6px)' }}>
-                  {hour}:00
+        <Card
+          style={{
+            width: '100%',
+            minWidth: 0,
+            overflow: 'hidden',
+            padding: m ? 10 : 16,
+          }}
+        >
+          <div
+            className={!m ? 'uptgo-scroll-x' : undefined}
+            style={{
+              width: '100%',
+              minWidth: 0,
+              overflowX: m ? 'hidden' : 'auto',
+            }}
+          >
+            <div
+              style={{
+                position: 'relative',
+                width: gridWidth,
+                minWidth: m ? 0 : 820,
+                display: 'grid',
+                gridTemplateColumns: m
+                  ? '44px minmax(0, 1fr)'
+                  : `56px repeat(${shownDays.length}, minmax(142px, 1fr))`,
+              }}
+            >
+              <div
+                style={{
+                  height: headH,
+                  borderRight: '1px solid var(--border)',
+                }}
+              />
+
+              {shownDays.map((dayIndex) => (
+                <div
+                  key={dayIndex}
+                  style={{
+                    height: headH,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: 'var(--text-2)',
+                    borderBottom: '1px solid var(--border)',
+                  }}
+                >
+                  {days[dayIndex]}
+                </div>
+              ))}
+
+              <div>
+                {hours.map((hour) => (
+                  <div
+                    key={hour}
+                    style={{
+                      height: rowH,
+                      paddingTop: 6,
+                      paddingRight: 7,
+                      textAlign: 'right',
+                      fontSize: 10.5,
+                      color: 'var(--text-3)',
+                      borderRight: '1px solid var(--border)',
+                    }}
+                  >
+                    {hour}:00
+                  </div>
+                ))}
+              </div>
+
+              {shownDays.map((dayIndex) => (
+                <div
+                  key={dayIndex}
+                  style={{
+                    position: 'relative',
+                    minWidth: 0,
+                    height: rowH * hours.length,
+                  }}
+                >
+                  {hours.map((hour) => (
+                    <div
+                      key={hour}
+                      style={{
+                        height: rowH,
+                        borderBottom: '1px solid var(--border)',
+                      }}
+                    />
+                  ))}
+
+                  {DATA.schedule
+                    .filter((block: any) => block.day === dayIndex)
+                    .map((block: any) => {
+                      const subject = subjectById(block.subject)
+                      const top = (block.start - hours[0]) * rowH
+                      const height = Math.max(
+                        (block.end - block.start) * rowH - 5,
+                        42,
+                      )
+
+                      return (
+                        <button
+                          key={`${block.day}-${block.start}-${block.subject}`}
+                          onClick={() =>
+                            toast(
+                              `${subject.name} · ${block.start}:00–${block.end}:00`,
+                            )
+                          }
+                          style={{
+                            position: 'absolute',
+                            top: top + 3,
+                            left: m ? 5 : 8,
+                            right: m ? 5 : 8,
+                            height,
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            background: cSoftVar(subject.color),
+                            border: 'none',
+                            borderLeft: `3px solid ${cVar(subject.color)}`,
+                            borderRadius: 'var(--r-xs)',
+                            padding: m ? '7px 8px' : '8px 10px',
+                            overflow: 'hidden',
+                            color: 'var(--text)',
+                          }}
+                        >
+                          <strong
+                            style={{
+                              display: 'block',
+                              fontSize: m ? 11.5 : 12.5,
+                              lineHeight: 1.15,
+                              color: cVar(subject.color),
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                            }}
+                          >
+                            {subject.name}
+                          </strong>
+
+                          <span
+                            style={{
+                              display: 'block',
+                              marginTop: 3,
+                              fontSize: m ? 10.5 : 11.5,
+                              color: 'var(--text-2)',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                            }}
+                          >
+                            {block.start}:00–{block.end}:00
+                          </span>
+
+                          {height > 56 && (
+                            <span
+                              style={{
+                                display: 'block',
+                                marginTop: 2,
+                                fontSize: m ? 10 : 11,
+                                color: 'var(--text-3)',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                              }}
+                            >
+                              {subject.room}
+                            </span>
+                          )}
+                        </button>
+                      )
+                    })}
                 </div>
               ))}
             </div>
-
-            {shownDays.map((dayIndex) => (
-              <div key={dayIndex} style={{ flex: 1, position: 'relative', borderLeft: '1px solid var(--border)' }}>
-                <div style={{ height: headH, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 600, color: 'var(--text-2)' }}>
-                  {days[dayIndex]}
-                </div>
-
-                <div style={{ position: 'relative' }}>
-                  {hours.map((hour) => (
-                    <div key={hour} style={{ height: rowH, borderTop: '1px solid var(--border)' }} />
-                  ))}
-
-                  {DATA.schedule.filter((block: any) => block.day === dayIndex).map((block: any, index: number) => {
-                    const subject = subjectById(block.subject)
-                    const top = (block.start - hours[0]) * rowH
-                    const height = (block.end - block.start) * rowH - 4
-
-                    return (
-                      <button
-                        key={index}
-                        onClick={() => toast(`${subject.name} · ${block.start}:00–${block.end}:00`)}
-                        style={{
-                          position: 'absolute',
-                          top: top + 2,
-                          left: 3,
-                          right: 3,
-                          height,
-                          cursor: 'pointer',
-                          textAlign: 'left',
-                          background: cSoftVar(subject.color),
-                          borderLeft: `3px solid ${cVar(subject.color)}`,
-                          borderRadius: 'var(--r-xs)',
-                          padding: '5px 7px',
-                          overflow: 'hidden',
-                          border: 'none',
-                          borderLeftWidth: 3,
-                          borderLeftStyle: 'solid',
-                          borderLeftColor: cVar(subject.color),
-                        }}
-                      >
-                        <div style={{ fontSize: 11.5, fontWeight: 600, color: cVar(subject.color), lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {subject.name}
-                        </div>
-
-                        <div style={{ fontSize: 10, color: 'var(--text-2)', marginTop: 2 }}>
-                          {block.start}:00–{block.end}:00
-                        </div>
-
-                        {height > 56 && <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 2 }}>{subject.room}</div>}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            ))}
           </div>
         </Card>
-      </FadeIn>
 
-      <FadeIn delay={160}>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <div
+          className="schedule-legend"
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 7,
+            marginTop: 14,
+            width: '100%',
+            minWidth: 0,
+          }}
+        >
           {DATA.subjects.map((subject: any) => (
-            <Pill key={subject.id} color={cVar(subject.color)} bg={cSoftVar(subject.color)} dot>
+            <span
+              key={subject.id}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                maxWidth: '100%',
+                padding: '5px 9px',
+                borderRadius: 'var(--r-full)',
+                background: cSoftVar(subject.color),
+                color: cVar(subject.color),
+                fontSize: 11,
+                fontWeight: 700,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <span
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: '50%',
+                  background: cVar(subject.color),
+                  flexShrink: 0,
+                }}
+              />
               {subject.name}
-            </Pill>
+            </span>
           ))}
         </div>
-      </FadeIn>
-    </div>
+      </div>
+    </FadeIn>
   )
 }
