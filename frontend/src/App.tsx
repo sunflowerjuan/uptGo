@@ -1,11 +1,9 @@
 import { DATA } from './data/data'
 import { useEffect, useRef, useState } from 'react'
 import { Icon } from './components/Icons'
-import { Logo } from './components/Logo'
 import { Sheet, EmptyState, cSoftVar, cVar } from './components/UI'
 import { TopBar, Sidebar, BottomNav, MenuSheet } from './components/Nav'
 import { useTweaks } from './components/TweaksPanel'
-
 import { Login, ErrorScreen } from './screens/Auth'
 import { Dashboard } from './screens/Dashboard'
 import { Tasks, TaskDetail } from './screens/Tasks'
@@ -46,9 +44,6 @@ declare global {
     __UPTGO_MOBILE__?: boolean
   }
 }
-type StatusBarProps = {
-  online: boolean
-}
 
 type ToastProps = {
   msg: string
@@ -73,12 +68,12 @@ type QuickAddSheetProps = {
 }
 
 function useIsMobile(breakpoint = 820) {
-  const getValue = () => {
+  const getIsMobile = () => {
     if (typeof window === 'undefined') return false
     return window.matchMedia(`(max-width: ${breakpoint}px)`).matches
   }
 
-  const [isMobile, setIsMobile] = useState(getValue)
+  const [isMobile, setIsMobile] = useState(getIsMobile)
 
   useEffect(() => {
     const mediaQuery = window.matchMedia(`(max-width: ${breakpoint}px)`)
@@ -98,17 +93,6 @@ function useIsMobile(breakpoint = 820) {
   return isMobile
 }
 
-function StatusBar({ online }: StatusBarProps) {
-  return (
-    <div style={{ height: 34, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 22px', flexShrink: 0, background: 'var(--surface)', color: 'var(--text)' }}>
-      <span style={{ fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-display)' }}>9:41</span>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <Icon name={online ? 'globe' : 'wifiOff'} size={14} color="var(--text)" />
-        <svg width="22" height="12" viewBox="0 0 24 12" fill="none"><rect x="1" y="1" width="19" height="10" rx="3" stroke="var(--text)" strokeWidth="1.2" opacity="0.5" /><rect x="3" y="3" width="13" height="6" rx="1.5" fill="var(--text)" /><rect x="21" y="4" width="2" height="4" rx="1" fill="var(--text)" opacity="0.5" /></svg>
-      </div>
-    </div>
-  );
-}
 
 function Toast({ msg }: ToastProps) {
   return (
@@ -255,7 +239,6 @@ function QuickAddSheet({ open, onClose, toast }: QuickAddSheetProps) {
     </Sheet>
   )
 }
-
 const TWEAK_DEFAULTS: TweakValues = {
   palette: 'verde',
   dark: false,
@@ -268,7 +251,7 @@ export default function App() {
   const [t, setTweak] = useTweaks<TweakValues>(TWEAK_DEFAULTS)
   const theme = t.dark ? 'dark' : 'light';
   const isMobile = useIsMobile()
-  window.__UPTGO_MOBILE__ = isMobile;
+  window.__UPTGO_MOBILE__ = isMobile
 
   const [authed, setAuthed] = useState(() => localStorage.getItem('uptgo_auth') === '1');
   const [route, setRoute] = useState<AppRoute>(() => {
@@ -365,7 +348,6 @@ export default function App() {
   }
 
   const isError = route === 'offline' || route === 'notfound';
-  const mainPad = isMobile ? 'var(--space-pad-mobile)' : 'var(--space-pad-desk)';
 
   const appInner = !authed ? (
     <Login onLogin={login} />
@@ -422,7 +404,7 @@ export default function App() {
         <main
           className="uptgo-main"
           style={{
-            padding: isMobile ? mainPad : mainPad,
+            padding: isMobile ? '14px' : '28px',
           }}
         >
           <div className={isMobile ? 'uptgo-mobile-content' : 'uptgo-content'}>
@@ -475,8 +457,7 @@ export default function App() {
         {toastMsg && <Toast msg={toastMsg} />}
       </div>
     </div>
-  );
-
+  )
   return (
     <div
       className="uptgo-root"
