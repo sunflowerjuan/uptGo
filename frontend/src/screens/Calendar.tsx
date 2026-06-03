@@ -1,6 +1,6 @@
 import React from 'react'
-import { useState } from 'react'
 import { DATA } from '../data/data'
+import { CreateAcademicItemModal, type CreateItemType, } from '../components/CreateAcademicItemModal'
 import { Button, Card, EmptyState, FadeIn, IconButton, Pill, SectionTitle, cSoftVar, cVar, subjectById, } from '../components/UI'
 import { Icon } from '../components/Icons'
 type AnyProps = Record<string, any>
@@ -40,23 +40,13 @@ export function Calendar({ m, onAdd }: AnyProps) {
 
   const [quickCreateOpen, setQuickCreateOpen] = React.useState(false)
   const [selectedCreateDate, setSelectedCreateDate] = React.useState<string | null>(null)
-
-  const [createType, setCreateType] = React.useState<'evento' | 'clase' | 'tarea' | null>(null)
-  const [createTitle, setCreateTitle] = React.useState('')
-  const [createTime, setCreateTime] = React.useState('08:00')
+  const [createType, setCreateType] = React.useState<CreateItemType | null>(null)
 
   const year = 2026
   const month = 4
   const first = new Date(year, month, 1)
   const startDow = (first.getDay() + 6) % 7
   const daysInMonth = new Date(year, month + 1, 0).getDate()
-
-  const openCreateForm = (type: 'evento' | 'clase' | 'tarea') => {
-    setQuickCreateOpen(false)
-    setCreateType(type)
-    setCreateTitle('')
-    setCreateTime('08:00')
-  }
 
   const cells: Array<number | null> = [
     ...Array(startDow).fill(null),
@@ -78,7 +68,15 @@ export function Calendar({ m, onAdd }: AnyProps) {
 
   const closeQuickCreate = () => {
     setQuickCreateOpen(false)
-    setSelectedCreateDate(null)
+  }
+
+  const openCreateForm = (type: CreateItemType) => {
+    setQuickCreateOpen(false)
+    setCreateType(type)
+  }
+
+  const closeCreateForm = () => {
+    setCreateType(null)
   }
 
   const agendaDay = (day: number) => {
@@ -117,26 +115,32 @@ export function Calendar({ m, onAdd }: AnyProps) {
     return agendaDay(day).slice(0, m ? 1 : 2)
   }
 
-  const createOptions = [
-    {
-      type: 'evento' as const,
-      icon: 'calendar',
-      title: 'Crear evento',
-      sub: 'Agregar una actividad puntual a este día.',
-    },
-    {
-      type: 'clase' as const,
-      icon: 'clock',
-      title: 'Crear clase',
-      sub: 'Programar una clase o bloque académico.',
-    },
-    {
-      type: 'tarea' as const,
-      icon: 'tasks',
-      title: 'Crear tarea',
-      sub: 'Agregar una entrega o pendiente.',
-    },
-  ]
+  const createOptions: Array<{
+    type: CreateItemType
+    icon: string
+    title: string
+    sub: string
+  }> = [
+      {
+        type: 'evento',
+        icon: 'calendar',
+        title: 'Crear evento',
+        sub: 'Agregar una actividad puntual a este día.',
+      },
+      {
+        type: 'clase',
+        icon: 'clock',
+        title: 'Crear clase',
+        sub: 'Programar una clase o bloque académico.',
+      },
+      {
+        type: 'tarea',
+        icon: 'tasks',
+        title: 'Crear tarea',
+        sub: 'Agregar una entrega o pendiente.',
+      },
+    ]
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <FadeIn>
@@ -784,6 +788,16 @@ export function Calendar({ m, onAdd }: AnyProps) {
           </div>
         </div>
       )}
+
+      <CreateAcademicItemModal
+        open={!!createType}
+        type={createType || 'evento'}
+        initialDate={selectedCreateDate}
+        onClose={closeCreateForm}
+        onCreated={(item) => {
+          console.log('Elemento creado desde calendario:', item)
+        }}
+      />
     </div>
   )
 }
