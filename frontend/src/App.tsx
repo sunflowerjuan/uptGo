@@ -1,10 +1,11 @@
 import { DATA } from './data/data'
 import { useEffect, useRef, useState } from 'react'
+import { useAuth } from './contexts/AuthContext'
 import { Icon } from './components/Icons'
 import { Sheet, EmptyState, cSoftVar, cVar } from './components/UI'
 import { TopBar, Sidebar, BottomNav, MenuSheet } from './components/Nav'
 import { useTweaks } from './components/TweaksPanel'
-import { Login, ErrorScreen } from './screens/Auth'
+import { Login, ErrorScreen, CompleteProfileModal } from './screens/Auth'
 import { Dashboard } from './screens/Dashboard'
 import { Tasks, TaskDetail } from './screens/Tasks'
 import { Calendar, Schedule } from './screens/Calendar'
@@ -470,9 +471,8 @@ export default function App() {
   const [reminderParent, setReminderParent] = useState<ReminderParent | null>(null)
   const [createdScheduleBlocks, setCreatedScheduleBlocks] = useState<any[]>([])
 
-  const [authed, setAuthed] = useState(
-    () => localStorage.getItem('uptgo_auth') === '1',
-  )
+  const { isAuthenticated, user: authUser, logout: authLogout, handleOAuthCallback, needsProfileCompletion } = useAuth()
+  const [profilePromptDismissed, setProfilePromptDismissed] = useState(false)
 
   const [route, setRoute] = useState<AppRoute>(() => {
     const savedRoute = localStorage.getItem('uptgo_route') as AppRoute | null
@@ -494,6 +494,16 @@ export default function App() {
     localStorage.setItem('uptgo_route', route)
   }, [route])
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const accessToken = params.get('accessToken')
+    const refreshToken = params.get('refreshToken')
+    if (accessToken && refreshToken) {
+      void handleOAuthCallback(accessToken, refreshToken).then(() => go('dashboard'))
+      window.history.replaceState({}, document.title, window.location.pathname)
+    }
+  }, [])
+
   const toast = (message: string) => {
     setToastMsg(message)
 
@@ -509,15 +519,12 @@ export default function App() {
     setRoute(nextRoute as AppRoute)
   }
 
-  const login = () => {
-    setAuthed(true)
-    localStorage.setItem('uptgo_auth', '1')
+  const handleLoginSuccess = () => {
     go('dashboard')
   }
 
   const logout = () => {
-    setAuthed(false)
-    localStorage.removeItem('uptgo_auth')
+    authLogout()
     setOpenTaskId(null)
     setSheet(null)
     setCreateModalType(null)
@@ -730,8 +737,12 @@ export default function App() {
     }
   }
 
-  const appInner = !authed ? (
-    <Login onLogin={login} />
+  const displayUser = authUser
+    ? { ...DATA.user, name: authUser.name, email: authUser.email, initials: authUser.initials ?? authUser.name.slice(0, 2).toUpperCase(), program: authUser.program ?? DATA.user.program, short: authUser.name.split(' ')[0] }
+    : DATA.user
+
+  const appInner = !isAuthenticated ? (
+    <Login onLogin={handleLoginSuccess} />
   ) : (
     <div className={isMobile ? 'uptgo-mobile-shell' : 'uptgo-desktop-shell'}>
       {!isError && !isMobile && t.navStyle !== 'top' && (
@@ -739,7 +750,7 @@ export default function App() {
           route={route}
           go={go}
           rail={t.navStyle === 'rail'}
-          user={DATA.user}
+          user={displayUser}
           onPomodoro={() => setSheet('pomodoro')}
         />
       )}
@@ -751,7 +762,7 @@ export default function App() {
             navStyle={t.navStyle}
             route={route}
             go={go}
-            user={DATA.user}
+            user={displayUser}
             online={online}
             onSearch={() => setSheet('search')}
             onNotif={() => setSheet('notif')}
@@ -828,7 +839,7 @@ export default function App() {
           onClose={() => setSheet(null)}
           route={route}
           go={go}
-          user={DATA.user}
+          user={displayUser}
           theme={theme}
           onTheme={() => setTweak('dark', !t.dark)}
           onPomodoro={() => setSheet('pomodoro')}
@@ -868,6 +879,10 @@ export default function App() {
         />
 
         {toastMsg && <Toast msg={toastMsg} />}
+
+        {isAuthenticated && needsProfileCompletion && !profilePromptDismissed && (
+          <CompleteProfileModal onDismiss={() => setProfilePromptDismissed(true)} />
+        )}
       </div>
     </div>
   )

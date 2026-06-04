@@ -667,6 +667,7 @@ body,
   overflow-y: auto;
   overflow-x: clip;
   -webkit-overflow-scrolling: touch;
+  background: var(--bg);
 }
 
 .uptgo-content {

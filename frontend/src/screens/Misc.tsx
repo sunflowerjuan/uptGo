@@ -2,7 +2,9 @@ import React, { useState } from 'react'
 import { DATA } from '../data/data'
 import { GoogleCampusMap, type CampusPlace } from '../components/GoogleCampusMap'
 import { Icon } from '../components/Icons'
-import { Avatar, Button, Card, FadeIn, SectionTitle, Sheet, } from '../components/UI'
+import { Avatar, Button, Card, FadeIn, SectionTitle, Sheet } from '../components/UI'
+import { useAuth } from '../contexts/AuthContext'
+import { ApiError } from '../services/api'
 
 type AnyProps = Record<string, any>
 
@@ -115,14 +117,152 @@ function SettingRow({ icon, title, sub, children, last }: AnyProps) {
   )
 }
 
+const settingInputStyle: React.CSSProperties = {
+  width: '100%',
+  padding: '11px 14px',
+  border: '1.5px solid var(--border)',
+  borderRadius: 'var(--r-sm)',
+  background: 'var(--surface)',
+  fontFamily: 'var(--font-ui)',
+  fontSize: 14,
+  color: 'var(--text)',
+  outline: 'none',
+  boxSizing: 'border-box',
+}
+
+function EditProfileSheet({ open, onClose, toast }: { open: boolean; onClose: () => void; toast: (msg: string) => void }) {
+  const { user, updateProfile } = useAuth()
+  const [name, setName] = React.useState('')
+  const [program, setProgram] = React.useState('')
+  const [semester, setSemester] = React.useState('')
+  const [loading, setLoading] = React.useState(false)
+  const [error, setError] = React.useState('')
+
+  React.useEffect(() => {
+    if (open) {
+      setName(user?.name ?? '')
+      setProgram(user?.program ?? '')
+      setSemester(user?.semester ?? '')
+      setError('')
+    }
+  }, [open, user])
+
+  const handleSave = async () => {
+    if (!name.trim()) {
+      setError('El nombre es obligatorio')
+      return
+    }
+    setLoading(true)
+    setError('')
+    try {
+      await updateProfile({
+        name: name.trim(),
+        program: program.trim() || undefined,
+        semester: semester.trim() || undefined,
+      })
+      onClose()
+      toast('Perfil actualizado')
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Error al guardar. Intenta de nuevo.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <Sheet open={open} onClose={onClose} title="Editar perfil">
+      <div style={{ fontSize: 12.5, color: 'var(--text-3)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <Icon name="mail" size={13} color="var(--text-3)" />
+        {user?.email}
+        <span style={{ marginLeft: 4, fontSize: 11, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--r-full)', padding: '1px 8px' }}>
+          no editable
+        </span>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div>
+          <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-3)', display: 'block', marginBottom: 6 }}>Nombre completo *</label>
+          <input
+            placeholder="Tu nombre"
+            value={name}
+            onChange={e => { setName(e.target.value); setError('') }}
+            disabled={loading}
+            style={{ ...settingInputStyle, opacity: loading ? 0.6 : 1 }}
+          />
+        </div>
+        <div>
+          <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-3)', display: 'block', marginBottom: 6 }}>Programa académico</label>
+          <input
+            placeholder="Ej: Ingeniería de Sistemas"
+            value={program}
+            onChange={e => setProgram(e.target.value)}
+            disabled={loading}
+            style={{ ...settingInputStyle, opacity: loading ? 0.6 : 1 }}
+          />
+        </div>
+        <div>
+          <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-3)', display: 'block', marginBottom: 6 }}>Semestre</label>
+          <input
+            placeholder="Ej: Semestre VIII · 2026"
+            value={semester}
+            onChange={e => setSemester(e.target.value)}
+            disabled={loading}
+            style={{ ...settingInputStyle, opacity: loading ? 0.6 : 1 }}
+          />
+        </div>
+      </div>
+
+      {error && (
+        <div style={{
+          marginTop: 12, padding: '10px 14px', borderRadius: 'var(--r-sm)',
+          background: 'oklch(0.97 0.02 15)', border: '1px solid oklch(0.82 0.08 15)',
+          color: 'oklch(0.45 0.15 15)', fontSize: 13,
+        }}>
+          {error}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: 10, marginTop: 22 }}>
+        <Button variant="outline" full onClick={onClose} disabled={loading}>Cancelar</Button>
+        <Button variant="primary" full onClick={handleSave} disabled={loading}>
+          {loading ? 'Guardando…' : 'Guardar cambios'}
+        </Button>
+      </div>
+    </Sheet>
+  )
+}
+
 export function Settings({ m, theme, onTheme, palette, onPalette, onLogout, toast }: AnyProps) {
+  const { user, registerWebAuthn } = useAuth()
   const [notif, setNotif] = React.useState<Record<string, boolean>>({ vencimiento: true, clase: true, recordatorio: true, sync: false })
   const [lang, setLang] = React.useState('es')
+  const [editOpen, setEditOpen] = React.useState(false)
+  const [bioState, setBioState] = React.useState<'idle' | 'registering' | 'ok' | 'error'>('idle')
+  const [bioError, setBioError] = React.useState('')
+
   const palettes = [['verde', 'Verde'], ['cobalto', 'Cobalto'], ['arcilla', 'Arcilla']]
   const paletteColors: Record<string, string> = {
     verde: 'oklch(0.52 0.125 142)',
     cobalto: 'oklch(0.52 0.16 258)',
     arcilla: 'oklch(0.58 0.135 45)',
+  }
+
+  const displayName = user?.name ?? DATA.user.name
+  const displayEmail = user?.email ?? DATA.user.email
+  const displayProgram = user?.program ?? null
+  const displayInitials = user?.initials ?? (user?.name ? user.name.slice(0, 2).toUpperCase() : DATA.user.initials)
+
+  const handleRegisterBio = async () => {
+    setBioState('registering')
+    setBioError('')
+    try {
+      await registerWebAuthn()
+      setBioState('ok')
+      toast('Huella / Face ID registrado correctamente')
+    } catch (err) {
+      setBioState('error')
+      setBioError(err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Error al registrar biometría')
+    }
   }
 
   return (
@@ -133,15 +273,20 @@ export function Settings({ m, theme, onTheme, palette, onPalette, onLogout, toas
         <Card pad={m ? 18 : 22}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <div style={{ position: 'relative' }}>
-              <Avatar initials={DATA.user.initials} size={64} />
-              <button onClick={() => toast('Cambiar foto (cámara)')} style={{ position: 'absolute', bottom: -2, right: -2, width: 26, height: 26, borderRadius: '50%', background: 'var(--primary)', color: 'var(--on-primary)', border: '2px solid var(--surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><Icon name="camera" size={13} /></button>
+              <Avatar initials={displayInitials} size={64} />
+              <button onClick={() => toast('Cambiar foto (cámara)')} style={{ position: 'absolute', bottom: -2, right: -2, width: 26, height: 26, borderRadius: '50%', background: 'var(--primary)', color: 'var(--on-primary)', border: '2px solid var(--surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                <Icon name="camera" size={13} />
+              </button>
             </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 17, fontWeight: 600, color: 'var(--text)', fontFamily: 'var(--font-display)' }}>{DATA.user.name}</div>
-              <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 2 }}>{DATA.user.program}</div>
-              <div style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 1 }}>{DATA.user.email}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 17, fontWeight: 600, color: 'var(--text)', fontFamily: 'var(--font-display)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName}</div>
+              {displayProgram
+                ? <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 2 }}>{displayProgram}</div>
+                : <div style={{ fontSize: 12, color: 'var(--warn)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}><Icon name="flag" size={11} color="var(--warn)" />Perfil incompleto</div>
+              }
+              <div style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayEmail}</div>
             </div>
-            {!m && <Button variant="outline" size="sm" icon="edit" onClick={() => toast('Editar perfil')}>Editar</Button>}
+            <Button variant="outline" size="sm" icon="edit" onClick={() => setEditOpen(true)}>Editar</Button>
           </div>
         </Card>
       </FadeIn>
@@ -174,6 +319,48 @@ export function Settings({ m, theme, onTheme, palette, onPalette, onLogout, toas
 
       <FadeIn delay={150}>
         <Card pad={m ? 16 : 20}>
+          <SectionTitle>Seguridad</SectionTitle>
+          <SettingRow
+            icon="fingerprint"
+            title="Huella / Face ID"
+            sub={bioState === 'ok' ? 'Credencial biométrica registrada' : bioState === 'error' ? bioError || 'No se pudo registrar' : 'Inicia sesión sin contraseña'}
+            last
+          >
+            {bioState === 'ok' ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ok)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <Icon name="check" size={14} color="var(--ok)" />Registrada
+                </span>
+                <Button variant="ghost" size="sm" onClick={() => { setBioState('idle'); setBioError('') }}>Actualizar</Button>
+              </div>
+            ) : (
+              <button
+                onClick={handleRegisterBio}
+                disabled={bioState === 'registering'}
+                style={{
+                  padding: '7px 14px', borderRadius: 'var(--r-sm)', border: '1.5px solid var(--primary)',
+                  background: bioState === 'error' ? 'var(--danger-soft)' : 'var(--primary-soft)',
+                  color: bioState === 'error' ? 'var(--danger)' : 'var(--primary-text)',
+                  fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: 600,
+                  cursor: bioState === 'registering' ? 'not-allowed' : 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap',
+                  borderColor: bioState === 'error' ? 'var(--danger)' : 'var(--primary)',
+                }}
+              >
+                <Icon
+                  name="fingerprint"
+                  size={15}
+                  style={bioState === 'registering' ? { animation: 'uptgo-pulse 1s ease-in-out infinite' } : {}}
+                />
+                {bioState === 'registering' ? 'Verificando…' : bioState === 'error' ? 'Reintentar' : 'Registrar'}
+              </button>
+            )}
+          </SettingRow>
+        </Card>
+      </FadeIn>
+
+      <FadeIn delay={200}>
+        <Card pad={m ? 16 : 20}>
           <SectionTitle>Notificaciones</SectionTitle>
           {[
             ['vencimiento', 'flag', 'Vencimiento de tareas'],
@@ -188,7 +375,7 @@ export function Settings({ m, theme, onTheme, palette, onPalette, onLogout, toas
         </Card>
       </FadeIn>
 
-      <FadeIn delay={200}>
+      <FadeIn delay={250}>
         <Card pad={m ? 16 : 20}>
           <SectionTitle>Preferencias</SectionTitle>
           <SettingRow icon="globe" title="Idioma">
@@ -209,11 +396,13 @@ export function Settings({ m, theme, onTheme, palette, onPalette, onLogout, toas
         </Card>
       </FadeIn>
 
-      <FadeIn delay={250}>
+      <FadeIn delay={300}>
         <Button variant="danger" icon="logout" full onClick={onLogout}>Cerrar sesión</Button>
       </FadeIn>
 
       <div style={{ textAlign: 'center', fontSize: 11.5, color: 'var(--text-3)', paddingBottom: 4 }}>UPTGO · versión 1.0 · PWA</div>
+
+      <EditProfileSheet open={editOpen} onClose={() => setEditOpen(false)} toast={toast} />
     </div>
   )
 }
