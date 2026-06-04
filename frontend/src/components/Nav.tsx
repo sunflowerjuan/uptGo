@@ -20,6 +20,7 @@ type User = {
   name: string
   program: string
   semester?: string
+  photo?: string | null
 }
 
 type GoFunction = (route: string) => void
@@ -332,7 +333,7 @@ export function Sidebar({ route, go, rail = false, user, onPomodoro }: SidebarPr
               marginTop: 10,
             }}
           >
-            <Avatar initials={user.initials} size={42} />
+            <Avatar initials={user.initials} size={42} photo={user.photo} />
 
             <div style={{ minWidth: 0, flex: 1 }}>
               <div
@@ -569,7 +570,7 @@ export function TopBar({
               padding: 0,
             }}
           >
-            <Avatar initials={user.initials} size={36} />
+            <Avatar initials={user.initials} size={36} photo={user.photo} />
           </button>
         )}
       </div>
@@ -756,7 +757,7 @@ export function MenuSheet({
           padding: '4px 2px 16px',
         }}
       >
-        <Avatar initials={user.initials} size={46} />
+        <Avatar initials={user.initials} size={46} photo={user.photo} />
         <div>
           <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>
             {user.name}

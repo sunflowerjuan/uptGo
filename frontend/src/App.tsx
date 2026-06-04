@@ -738,7 +738,7 @@ export default function App() {
   }
 
   const displayUser = authUser
-    ? { ...DATA.user, name: authUser.name, email: authUser.email, initials: authUser.initials ?? authUser.name.slice(0, 2).toUpperCase(), program: authUser.program ?? DATA.user.program, short: authUser.name.split(' ')[0] }
+    ? { ...DATA.user, name: authUser.name, email: authUser.email, initials: authUser.initials ?? authUser.name.slice(0, 2).toUpperCase(), program: authUser.program ?? DATA.user.program, short: authUser.name.split(' ')[0], photo: localStorage.getItem('uptgo_user_avatar') }
     : DATA.user
 
   const appInner = !isAuthenticated ? (

@@ -288,7 +288,23 @@ export function IconButton({
   )
 }
 
-export function Avatar({ initials, size = 34, color }: AnyProps) {
+export function Avatar({ initials, size = 34, color, photo }: AnyProps) {
+  if (photo) {
+    return (
+      <div
+        style={{
+          width: size,
+          height: size,
+          borderRadius: 'var(--r-full)',
+          overflow: 'hidden',
+          flexShrink: 0,
+          border: '1.5px solid var(--border)',
+        }}
+      >
+        <img src={photo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+      </div>
+    )
+  }
   return (
     <div
       style={{
@@ -477,14 +493,14 @@ export function EmptyState({ icon, title, body }: AnyProps) {
   )
 }
 
-export function Sheet({ open, onClose, title, children }: AnyProps) {
+export function Sheet({ open, onClose, title, children, disableBackdropClose }: AnyProps) {
   const isMobile = Boolean((window as any).__UPTGO_MOBILE__)
 
   if (!open) return null
 
   return (
     <div
-      onClick={onClose}
+      onClick={disableBackdropClose ? undefined : onClose}
       style={{
         position: 'fixed',
         inset: 0,

@@ -130,6 +130,9 @@ const settingInputStyle: React.CSSProperties = {
   boxSizing: 'border-box',
 }
 
+const AVATAR_KEY = 'uptgo_user_avatar'
+const WEBAUTHN_KEY = (userId: string) => `uptgo_webauthn_${userId}`
+
 function EditProfileSheet({ open, onClose, toast }: { open: boolean; onClose: () => void; toast: (msg: string) => void }) {
   const { user, updateProfile } = useAuth()
   const [name, setName] = React.useState('')
@@ -170,7 +173,7 @@ function EditProfileSheet({ open, onClose, toast }: { open: boolean; onClose: ()
   }
 
   return (
-    <Sheet open={open} onClose={onClose} title="Editar perfil">
+    <Sheet open={open} onClose={onClose} title="Editar perfil" disableBackdropClose>
       <div style={{ fontSize: 12.5, color: 'var(--text-3)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6 }}>
         <Icon name="mail" size={13} color="var(--text-3)" />
         {user?.email}
@@ -237,8 +240,15 @@ export function Settings({ m, theme, onTheme, palette, onPalette, onLogout, toas
   const [notif, setNotif] = React.useState<Record<string, boolean>>({ vencimiento: true, clase: true, recordatorio: true, sync: false })
   const [lang, setLang] = React.useState('es')
   const [editOpen, setEditOpen] = React.useState(false)
-  const [bioState, setBioState] = React.useState<'idle' | 'registering' | 'ok' | 'error'>('idle')
+
+  const bioKey = user ? WEBAUTHN_KEY(user.id) : null
+  const [bioState, setBioState] = React.useState<'idle' | 'registering' | 'ok' | 'error'>(() =>
+    bioKey && localStorage.getItem(bioKey) === 'true' ? 'ok' : 'idle'
+  )
   const [bioError, setBioError] = React.useState('')
+
+  const fileInputRef = React.useRef<HTMLInputElement>(null)
+  const [avatarUrl, setAvatarUrl] = React.useState<string | null>(() => localStorage.getItem(AVATAR_KEY))
 
   const palettes = [['verde', 'Verde'], ['cobalto', 'Cobalto'], ['arcilla', 'Arcilla']]
   const paletteColors: Record<string, string> = {
@@ -252,16 +262,53 @@ export function Settings({ m, theme, onTheme, palette, onPalette, onLogout, toas
   const displayProgram = user?.program ?? null
   const displayInitials = user?.initials ?? (user?.name ? user.name.slice(0, 2).toUpperCase() : DATA.user.initials)
 
+  const handleAvatarFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        canvas.width = 96
+        canvas.height = 96
+        const ctx = canvas.getContext('2d')!
+        const side = Math.min(img.width, img.height)
+        ctx.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, 96, 96)
+        const url = canvas.toDataURL('image/jpeg', 0.85)
+        localStorage.setItem(AVATAR_KEY, url)
+        setAvatarUrl(url)
+        toast('Foto de perfil actualizada')
+      }
+      img.src = ev.target!.result as string
+    }
+    reader.readAsDataURL(file)
+    e.target.value = ''
+  }
+
+  const removeAvatar = () => {
+    localStorage.removeItem(AVATAR_KEY)
+    setAvatarUrl(null)
+    toast('Foto de perfil eliminada')
+  }
+
   const handleRegisterBio = async () => {
     setBioState('registering')
     setBioError('')
     try {
       await registerWebAuthn()
       setBioState('ok')
+      if (bioKey) localStorage.setItem(bioKey, 'true')
       toast('Huella / Face ID registrado correctamente')
     } catch (err) {
-      setBioState('error')
-      setBioError(err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Error al registrar biometría')
+      if (err instanceof Error && err.name === 'InvalidStateError') {
+        setBioState('ok')
+        if (bioKey) localStorage.setItem(bioKey, 'true')
+        toast('Credencial biométrica ya registrada en este dispositivo')
+      } else {
+        setBioState('error')
+        setBioError(err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Error al registrar biometría')
+      }
     }
   }
 
@@ -272,11 +319,23 @@ export function Settings({ m, theme, onTheme, palette, onPalette, onLogout, toas
       <FadeIn delay={50}>
         <Card pad={m ? 18 : 22}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <div style={{ position: 'relative' }}>
-              <Avatar initials={displayInitials} size={64} />
-              <button onClick={() => toast('Cambiar foto (cámara)')} style={{ position: 'absolute', bottom: -2, right: -2, width: 26, height: 26, borderRadius: '50%', background: 'var(--primary)', color: 'var(--on-primary)', border: '2px solid var(--surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-                <Icon name="camera" size={13} />
-              </button>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+              <div style={{ position: 'relative' }}>
+                <Avatar initials={displayInitials} size={64} photo={avatarUrl} />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Cambiar foto"
+                  style={{ position: 'absolute', bottom: -2, right: -2, width: 26, height: 26, borderRadius: '50%', background: 'var(--primary)', color: 'var(--on-primary)', border: '2px solid var(--surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                >
+                  <Icon name="camera" size={13} />
+                </button>
+                <input type="file" accept="image/*" ref={fileInputRef} onChange={handleAvatarFile} style={{ display: 'none' }} />
+              </div>
+              {avatarUrl && (
+                <button onClick={removeAvatar} style={{ fontSize: 11, color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-ui)', padding: 0, whiteSpace: 'nowrap' }}>
+                  Eliminar foto
+                </button>
+              )}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 17, fontWeight: 600, color: 'var(--text)', fontFamily: 'var(--font-display)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName}</div>

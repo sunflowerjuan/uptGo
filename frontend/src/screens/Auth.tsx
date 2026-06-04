@@ -260,7 +260,7 @@ export function Login({ onLogin }: { onLogin: () => void }) {
   )
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: m ? 'column' : 'row', overflow: 'auto', background: 'var(--surface)' }}>
+    <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: m ? 'column' : 'row', overflow: 'auto', background: 'var(--surface)' }}>
       {m ? (<>{<div style={{ flex: '0 0 auto' }}>{brand}</div>}{form}</>) : (<>{brand}{form}</>)}
     </div>
   )
