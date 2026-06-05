@@ -5,6 +5,328 @@ import { Button, Card, EmptyState, FadeIn, IconButton, Pill, SectionTitle, cSoft
 import { Icon } from '../components/Icons'
 type AnyProps = Record<string, any>
 
+// ---- CSV PARSER TYPES ----
+
+type CsvScheduleBlock = {
+  id: string
+  day: number
+  start: number
+  end: number
+  subject: string
+  title: string
+  room: string
+  teacher: string
+  color: number
+  created: boolean
+  subjectData: {
+    id: string
+    name: string
+    code: string
+    teacher: string
+    color: number
+  }
+}
+
+const CSV_DAY_MAP: Record<string, number> = {
+  L: 0, M: 1, X: 2, J: 3, V: 4, S: 5, D: 6,
+  Lun: 0, Mar: 1, 'Mié': 2, Jue: 3, Vie: 4, 'Sáb': 5, Dom: 6,
+}
+
+function parseTimeToHour(timeStr: string): number {
+  const [h] = timeStr.split(':')
+  return parseInt(h, 10)
+}
+
+function parseCsvRow(row: string): string[] {
+  const fields: string[] = []
+  let current = ''
+  let inQuotes = false
+  for (let i = 0; i < row.length; i++) {
+    const ch = row[i]
+    if (ch === '"') {
+      inQuotes = !inQuotes
+    } else if (ch === ',' && !inQuotes) {
+      fields.push(current.trim())
+      current = ''
+    } else {
+      current += ch
+    }
+  }
+  fields.push(current.trim())
+  return fields
+}
+
+function parseUptcCsv(text: string): CsvScheduleBlock[] | null {
+  const lines = text.split('\n').map((l) => l.trim()).filter(Boolean)
+  if (lines.length < 2) return null
+
+  const headers = parseCsvRow(lines[0]).map((h) => h.toLowerCase().replace(/[^a-záéíóú0-9]/gi, ''))
+
+  const colIdx = {
+    code: headers.findIndex((h) => h.includes('codigo') || h.includes('code')),
+    name: headers.findIndex((h) => h.includes('asignatura') || h.includes('materia') || h.includes('nombre')),
+    teacher: headers.findIndex((h) => h.includes('docente') || h.includes('profesor')),
+    room: headers.findIndex((h) => h.includes('salon') || h.includes('aula') || h.includes('room')),
+    schedule: headers.findIndex((h) => h.includes('horario') || h.includes('schedule')),
+    group: headers.findIndex((h) => h.includes('grupo') || h.includes('group')),
+  }
+
+  if (colIdx.name === -1 || colIdx.schedule === -1) return null
+
+  const subjectColorMap = new Map<string, number>()
+  let colorCounter = 1
+
+  const blocks: CsvScheduleBlock[] = []
+
+  for (let i = 1; i < lines.length; i++) {
+    const row = parseCsvRow(lines[i])
+    if (row.length < 2) continue
+
+    const code = colIdx.code >= 0 ? row[colIdx.code] || '' : ''
+    const name = colIdx.name >= 0 ? row[colIdx.name] || '' : ''
+    const teacher = colIdx.teacher >= 0 ? row[colIdx.teacher] || '' : ''
+    const room = colIdx.room >= 0 ? row[colIdx.room] || '' : ''
+    const scheduleStr = colIdx.schedule >= 0 ? row[colIdx.schedule] || '' : ''
+
+    if (!name || !scheduleStr) continue
+
+    const subjectKey = code || name
+    if (!subjectColorMap.has(subjectKey)) {
+      subjectColorMap.set(subjectKey, ((colorCounter - 1) % 6) + 1)
+      colorCounter++
+    }
+    const color = subjectColorMap.get(subjectKey) || 1
+
+    const subjectId = `csv-${subjectKey.replace(/\s/g, '-').toLowerCase()}`
+
+    // Parse schedule: "L 08:00-10:00 / X 08:00-10:00"
+    const parts = scheduleStr.split('/').map((p: string) => p.trim())
+    for (const part of parts) {
+      // Match: DAY HH:MM-HH:MM
+      const match = part.match(/^([A-ZÁÉÍÓÚa-záéíóú]+)\s+(\d{1,2}:\d{2})-(\d{1,2}:\d{2})/)
+      if (!match) continue
+      const dayKey = match[1].toUpperCase()
+      const dayNum = CSV_DAY_MAP[dayKey] ?? CSV_DAY_MAP[match[1]]
+      if (dayNum === undefined) continue
+      const start = parseTimeToHour(match[2])
+      const end = parseTimeToHour(match[3])
+
+      blocks.push({
+        id: `csv-${subjectId}-day${dayNum}-${start}`,
+        day: dayNum,
+        start,
+        end,
+        subject: subjectId,
+        title: name,
+        room,
+        teacher,
+        color,
+        created: true,
+        subjectData: {
+          id: subjectId,
+          name,
+          code,
+          teacher,
+          color,
+        },
+      })
+    }
+  }
+
+  return blocks.length > 0 ? blocks : null
+}
+
+function CsvImportModal({
+  open,
+  onClose,
+  onImport,
+}: {
+  open: boolean
+  onClose: () => void
+  onImport: (blocks: CsvScheduleBlock[]) => void
+}) {
+  const [preview, setPreview] = React.useState<CsvScheduleBlock[] | null>(null)
+  const [error, setError] = React.useState('')
+  const [filename, setFilename] = React.useState('')
+  const fileRef = React.useRef<HTMLInputElement | null>(null)
+
+  const reset = () => {
+    setPreview(null)
+    setError('')
+    setFilename('')
+    if (fileRef.current) fileRef.current.value = ''
+  }
+
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setFilename(file.name)
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      const text = ev.target?.result as string
+      const result = parseUptcCsv(text)
+      if (!result) {
+        setError('No se pudo interpretar el CSV. Verifica el formato UPTC.')
+        setPreview(null)
+      } else {
+        setError('')
+        setPreview(result)
+      }
+    }
+    reader.readAsText(file, 'UTF-8')
+  }
+
+  const handleImport = () => {
+    if (!preview) return
+    onImport(preview)
+    reset()
+    onClose()
+  }
+
+  if (!open) return null
+
+  const DOW_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 120,
+        background: 'oklch(0 0 0 / 0.28)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 18,
+      }}
+      onClick={() => { reset(); onClose() }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: 560,
+          maxWidth: '100%',
+          maxHeight: 'calc(100dvh - 36px)',
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: 22,
+          boxShadow: 'var(--shadow-pop)',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        <div
+          style={{
+            padding: '18px 20px 14px',
+            borderBottom: '1px solid var(--border)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 10,
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--text)', fontFamily: 'var(--font-display)' }}>
+              Importar horario CSV
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
+              Formato UPTC: CODIGO, ASIGNATURA, DOCENTE, HORARIO, SALON
+            </div>
+          </div>
+          <button
+            onClick={() => { reset(); onClose() }}
+            style={{ width: 34, height: 34, borderRadius: 'var(--r-full)', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Icon name="x" size={15} />
+          </button>
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div
+            style={{
+              border: '2px dashed var(--border)',
+              borderRadius: 'var(--r-md)',
+              padding: '24px 20px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 10,
+              cursor: 'pointer',
+              background: 'var(--surface-2)',
+            }}
+            onClick={() => fileRef.current?.click()}
+          >
+            <Icon name="upload" size={28} color="var(--text-3)" />
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>
+              {filename || 'Seleccionar archivo CSV'}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
+              Arrastra o haz clic para elegir un archivo .csv o .txt
+            </div>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".csv,.txt"
+              style={{ display: 'none' }}
+              onChange={handleFile}
+            />
+          </div>
+
+          {error && (
+            <div style={{ padding: '10px 14px', borderRadius: 'var(--r-sm)', background: 'var(--danger-soft)', color: 'var(--danger)', fontSize: 13, fontWeight: 600 }}>
+              {error}
+            </div>
+          )}
+
+          {preview && preview.length > 0 && (
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-2)', marginBottom: 8 }}>
+                VISTA PREVIA — {preview.length} bloque{preview.length !== 1 ? 's' : ''} detectado{preview.length !== 1 ? 's' : ''}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 260, overflowY: 'auto' }}>
+                {preview.map((block) => (
+                  <div
+                    key={block.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      padding: '10px 12px',
+                      borderRadius: 'var(--r-sm)',
+                      background: cSoftVar(block.color),
+                      border: `1px solid ${cVar(block.color)}`,
+                    }}
+                  >
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: cVar(block.color), flexShrink: 0 }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: cVar(block.color) }}>{block.title}</div>
+                      <div style={{ fontSize: 11.5, color: 'var(--text-3)' }}>
+                        {DOW_LABELS[block.day]} · {block.start}:00–{block.end}:00{block.room ? ` · ${block.room}` : ''}{block.teacher ? ` · ${block.teacher}` : ''}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div style={{ padding: '14px 18px', borderTop: '1px solid var(--border)', display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          <Button variant="ghost" onClick={() => { reset(); onClose() }}>Cancelar</Button>
+          <Button
+            variant="primary"
+            icon="plus"
+            onClick={handleImport}
+          >
+            Importar {preview ? `(${preview.length})` : ''}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const DOW = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 const MONTHS = [
   'enero',
@@ -910,13 +1232,14 @@ export function Calendar({ m, onAdd }: AnyProps) {
   )
 }
 
-export function Schedule({ m, onAdd, toast, scheduleItems = [] }: AnyProps) {
+export function Schedule({ m, onAdd, toast, scheduleItems = [], onImportSchedule }: AnyProps) {
   const days = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
   const hours = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
   const rowH = m ? 44 : 52
   const headH = m ? 34 : 40
 
   const [dayIdx, setDayIdx] = React.useState(0)
+  const [showCsvImport, setShowCsvImport] = React.useState(false)
 
   const shownDays = m ? [dayIdx] : [0, 1, 2, 3, 4, 5, 6]
   const gridWidth = m ? '100%' : 1120
@@ -967,26 +1290,33 @@ export function Schedule({ m, onAdd, toast, scheduleItems = [] }: AnyProps) {
       >
         {m && (
           <div style={{ marginBottom: 18 }}>
-            <h1
-              style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: 24,
-                lineHeight: 1.1,
-                color: 'var(--text)',
-                marginBottom: 8,
-              }}
-            >
-              Horario
-            </h1>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+              <div>
+                <h1
+                  style={{
+                    fontFamily: 'var(--font-display)',
+                    fontSize: 24,
+                    lineHeight: 1.1,
+                    color: 'var(--text)',
+                    marginBottom: 8,
+                  }}
+                >
+                  Horario
+                </h1>
 
-            <p
-              style={{
-                fontSize: 13,
-                color: 'var(--text-2)',
-              }}
-            >
-              Semana típica · {uniqueCreatedSubjects.length + DATA.subjects.length} materias
-            </p>
+                <p
+                  style={{
+                    fontSize: 13,
+                    color: 'var(--text-2)',
+                  }}
+                >
+                  Semana típica · {uniqueCreatedSubjects.length + DATA.subjects.length} materias
+                </p>
+              </div>
+              <Button size="sm" variant="soft" icon="upload" onClick={() => setShowCsvImport(true)}>
+                CSV
+              </Button>
+            </div>
           </div>
         )}
 
@@ -995,9 +1325,14 @@ export function Schedule({ m, onAdd, toast, scheduleItems = [] }: AnyProps) {
             title="Horario"
             subtitle={`Semana típica · ${uniqueCreatedSubjects.length + DATA.subjects.length} materias`}
             action={
-              <Button size="sm" onClick={onAdd}>
-                Agregar clase
-              </Button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <Button size="sm" variant="soft" icon="upload" onClick={() => setShowCsvImport(true)}>
+                  Importar CSV
+                </Button>
+                <Button size="sm" onClick={onAdd}>
+                  Agregar clase
+                </Button>
+              </div>
             }
           />
         )}
@@ -1316,6 +1651,15 @@ export function Schedule({ m, onAdd, toast, scheduleItems = [] }: AnyProps) {
           </div>
         </Card>
       </div>
+
+      <CsvImportModal
+        open={showCsvImport}
+        onClose={() => setShowCsvImport(false)}
+        onImport={(blocks) => {
+          onImportSchedule?.(blocks)
+          toast?.(`${blocks.length} bloque${blocks.length !== 1 ? 's' : ''} importado${blocks.length !== 1 ? 's' : ''} correctamente`)
+        }}
+      />
     </FadeIn>
   )
 }

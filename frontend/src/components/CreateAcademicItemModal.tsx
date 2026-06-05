@@ -5,12 +5,14 @@ import { Icon } from './Icons'
 
 export type CreateItemType = 'evento' | 'tarea' | 'clase' | 'nota'
 
+type AnyProps = Record<string, any>
+
 type CreateAcademicItemModalProps = {
     open: boolean
     type: CreateItemType
     initialDate?: string | null
     onClose: () => void
-    onCreated?: (item: any) => void
+    onCreated?: (item: AnyProps) => void
 }
 
 const TYPE_LABEL: Record<CreateItemType, string> = {
@@ -63,9 +65,9 @@ const DEFAULT_FORM = {
 
 type FormState = typeof DEFAULT_FORM
 
-function saveLocalItem(item: any) {
+function saveLocalItem(item: AnyProps) {
     const key = 'uptgo_created_items'
-    const current = JSON.parse(localStorage.getItem(key) || '[]')
+    const current = JSON.parse(localStorage.getItem(key) || '[]') as AnyProps[]
     localStorage.setItem(key, JSON.stringify([item, ...current]))
 }
 
@@ -152,6 +154,279 @@ function TwoCols({ children }: { children: React.ReactNode }) {
     )
 }
 
+function formatTimer(seconds: number): string {
+    const m = Math.floor(seconds / 60)
+    const s = seconds % 60
+    return `${m}:${String(s).padStart(2, '0')}`
+}
+
+function AudioCapture({ onAudioReady }: { onAudioReady: (blob: Blob, url: string, duration: string) => void }) {
+    const [recording, setRecording] = React.useState(false)
+    const [timer, setTimer] = React.useState(0)
+    const [audioUrl, setAudioUrl] = React.useState<string | null>(null)
+    const [audioDuration, setAudioDuration] = React.useState('')
+    const mediaRecorderRef = React.useRef<MediaRecorder | null>(null)
+    const chunksRef = React.useRef<Blob[]>([])
+    const timerRef = React.useRef<ReturnType<typeof setInterval> | null>(null)
+    const fileInputRef = React.useRef<HTMLInputElement | null>(null)
+
+    const startRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+            const recorder = new MediaRecorder(stream)
+            mediaRecorderRef.current = recorder
+            chunksRef.current = []
+
+            recorder.ondataavailable = (e) => {
+                if (e.data.size > 0) chunksRef.current.push(e.data)
+            }
+
+            recorder.onstop = () => {
+                const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
+                const url = URL.createObjectURL(blob)
+                const dur = formatTimer(timer)
+                setAudioUrl(url)
+                setAudioDuration(dur)
+                onAudioReady(blob, url, dur)
+                stream.getTracks().forEach((t) => t.stop())
+            }
+
+            recorder.start()
+            setRecording(true)
+            setTimer(0)
+            timerRef.current = setInterval(() => setTimer((p) => p + 1), 1000)
+        } catch {
+            // microphone not available
+        }
+    }
+
+    const stopRecording = () => {
+        if (mediaRecorderRef.current && recording) {
+            mediaRecorderRef.current.stop()
+            setRecording(false)
+            if (timerRef.current) {
+                clearInterval(timerRef.current)
+                timerRef.current = null
+            }
+        }
+    }
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+        const url = URL.createObjectURL(file)
+        setAudioUrl(url)
+        setAudioDuration('')
+        onAudioReady(file, url, '')
+    }
+
+    React.useEffect(() => {
+        return () => {
+            if (timerRef.current) clearInterval(timerRef.current)
+        }
+    }, [])
+
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <FieldLabel>Audio</FieldLabel>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                {/* Record button */}
+                <button
+                    type="button"
+                    onClick={recording ? stopRecording : startRecording}
+                    style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 8,
+                        padding: '16px 12px',
+                        borderRadius: 'var(--r-md)',
+                        border: `1px solid ${recording ? 'var(--danger)' : 'var(--border)'}`,
+                        background: recording ? 'var(--danger-soft)' : 'var(--surface-2)',
+                        color: recording ? 'var(--danger)' : 'var(--text-2)',
+                        cursor: 'pointer',
+                        fontFamily: 'var(--font-ui)',
+                        fontSize: 12.5,
+                        fontWeight: 600,
+                    }}
+                >
+                    <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Icon name="mic" size={22} />
+                        {recording && (
+                            <span
+                                style={{
+                                    position: 'absolute',
+                                    top: -3,
+                                    right: -3,
+                                    width: 10,
+                                    height: 10,
+                                    borderRadius: '50%',
+                                    background: 'var(--danger)',
+                                    animation: 'uptgo-ping 1s ease-in-out infinite',
+                                }}
+                            />
+                        )}
+                    </span>
+                    {recording ? `Grabando… ${formatTimer(timer)}` : 'Grabar audio'}
+                    {recording && (
+                        <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--danger)' }}>
+                            Toca para detener
+                        </span>
+                    )}
+                </button>
+
+                {/* File attach */}
+                <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 8,
+                        padding: '16px 12px',
+                        borderRadius: 'var(--r-md)',
+                        border: '1px solid var(--border)',
+                        background: 'var(--surface-2)',
+                        color: 'var(--text-2)',
+                        cursor: 'pointer',
+                        fontFamily: 'var(--font-ui)',
+                        fontSize: 12.5,
+                        fontWeight: 600,
+                    }}
+                >
+                    <Icon name="paperclip" size={22} />
+                    Adjuntar archivo
+                </button>
+            </div>
+
+            <input
+                ref={fileInputRef}
+                type="file"
+                accept="audio/*"
+                style={{ display: 'none' }}
+                onChange={handleFileChange}
+            />
+
+            {audioUrl && (
+                <div
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        padding: '10px 14px',
+                        borderRadius: 'var(--r-sm)',
+                        background: 'var(--ok-soft)',
+                        color: 'var(--ok)',
+                        fontSize: 13,
+                        fontWeight: 600,
+                    }}
+                >
+                    <Icon name="check" size={15} />
+                    Audio listo{audioDuration ? ` (${audioDuration})` : ''}
+                    <audio src={audioUrl} controls style={{ height: 28, flex: 1, minWidth: 0 }} />
+                </div>
+            )}
+        </div>
+    )
+}
+
+function ImageCapture({ onImageReady }: { onImageReady: (url: string) => void }) {
+    const [imageDataUrl, setImageDataUrl] = React.useState<string | null>(null)
+    const fileInputRef = React.useRef<HTMLInputElement | null>(null)
+
+    const handleFile = (file: File) => {
+        const reader = new FileReader()
+        reader.onload = (e) => {
+            const url = e.target?.result as string
+            setImageDataUrl(url)
+            onImageReady(url)
+        }
+        reader.readAsDataURL(file)
+    }
+
+    const handleCameraChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (file) handleFile(file)
+    }
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (file) handleFile(file)
+    }
+
+    const captureButtonStyle: React.CSSProperties = {
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        padding: '16px 12px',
+        borderRadius: 'var(--r-md)',
+        border: '1px solid var(--border)',
+        background: 'var(--surface-2)',
+        color: 'var(--text-2)',
+        cursor: 'pointer',
+        fontFamily: 'var(--font-ui)',
+        fontSize: 12.5,
+        fontWeight: 600,
+        userSelect: 'none',
+    }
+
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <FieldLabel>Imagen</FieldLabel>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                {/* Label wraps input directly — most reliable pattern for camera on iOS/Android */}
+                <label style={captureButtonStyle}>
+                    <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        style={{ display: 'none' }}
+                        onChange={handleCameraChange}
+                    />
+                    <Icon name="camera" size={22} />
+                    Tomar foto
+                </label>
+
+                <label style={captureButtonStyle}>
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        style={{ display: 'none' }}
+                        onChange={handleFileChange}
+                    />
+                    <Icon name="image" size={22} />
+                    Adjuntar imagen
+                </label>
+            </div>
+
+            {imageDataUrl && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <img
+                        src={imageDataUrl}
+                        alt="Vista previa"
+                        style={{
+                            width: '100%',
+                            maxHeight: 200,
+                            objectFit: 'cover',
+                            borderRadius: 'var(--r-sm)',
+                            border: '1px solid var(--border)',
+                        }}
+                    />
+                    <span style={{ fontSize: 11.5, color: 'var(--ok)', fontWeight: 600 }}>
+                        ✓ Imagen lista
+                    </span>
+                </div>
+            )}
+        </div>
+    )
+}
+
 export function CreateAcademicItemModal({
     open,
     type,
@@ -161,11 +436,19 @@ export function CreateAcademicItemModal({
 }: CreateAcademicItemModalProps) {
     const [form, setForm] = React.useState<FormState>(DEFAULT_FORM)
     const [error, setError] = React.useState('')
+    const [_audioBlob, setAudioBlob] = React.useState<Blob | null>(null)
+    const [audioUrl, setAudioUrl] = React.useState<string | null>(null)
+    const [audioDuration, setAudioDuration] = React.useState('')
+    const [imageDataUrl, setImageDataUrl] = React.useState<string | null>(null)
 
     React.useEffect(() => {
         if (!open) return
 
         setError('')
+        setAudioBlob(null)
+        setAudioUrl(null)
+        setAudioDuration('')
+        setImageDataUrl(null)
         setForm({
             ...DEFAULT_FORM,
             date: initialDate || '',
@@ -209,8 +492,6 @@ export function CreateAcademicItemModal({
     }
 
     const validate = () => {
-
-
         if (type === 'evento' && !form.date) {
             return 'La fecha es obligatoria.'
         }
@@ -279,7 +560,7 @@ export function CreateAcademicItemModal({
             type === 'clase'
                 ? form.subjectMode === 'new'
                     ? form.newSubjectName.trim()
-                    : DATA.subjects.find((subject: any) => subject.id === form.subject)?.name || ''
+                    : DATA.subjects.find((subject: AnyProps) => subject.id === form.subject)?.name || ''
                 : form.title.trim()
 
         const { title, location, locationUrl, ...formWithoutDuplicatedFields } = form
@@ -293,11 +574,10 @@ export function CreateAcademicItemModal({
                     before: form.reminderBefore,
                     note: form.reminderNote.trim(),
                     status: 'activo',
-
                 }
                 : null
 
-        const item = {
+        const item: AnyProps = {
             id: `${type}-${Date.now()}`,
             type,
             createdAt: new Date().toISOString(),
@@ -308,6 +588,17 @@ export function CreateAcademicItemModal({
             locationUrl: resolvedLocationUrl,
             subjectData: resolvedSubject,
             reminder: linkedReminder,
+        }
+
+        // Attach media for nota type
+        if (type === 'nota') {
+            if (form.noteType === 'audio' && audioUrl) {
+                item.audioUrl = audioUrl
+                item.duration = audioDuration
+            }
+            if (form.noteType === 'imagen' && imageDataUrl) {
+                item.imageUrl = imageDataUrl
+            }
         }
 
         saveLocalItem(item)
@@ -746,7 +1037,7 @@ export function CreateAcademicItemModal({
                                 style={inputStyle()}
                             >
                                 <option value="">Sin materia</option>
-                                {DATA.subjects.map((subject: any) => (
+                                {DATA.subjects.map((subject: AnyProps) => (
                                     <option key={subject.id} value={subject.id}>
                                         {subject.name}
                                     </option>
@@ -928,7 +1219,7 @@ export function CreateAcademicItemModal({
                                             style={inputStyle()}
                                         >
                                             <option value="">Selecciona una materia</option>
-                                            {DATA.subjects.map((subject: any) => (
+                                            {DATA.subjects.map((subject: AnyProps) => (
                                                 <option key={subject.id} value={subject.id}>
                                                     {subject.name}
                                                 </option>
@@ -1068,7 +1359,12 @@ export function CreateAcademicItemModal({
                             <Field label="Tipo de nota">
                                 <select
                                     value={form.noteType}
-                                    onChange={(event) => update('noteType', event.target.value)}
+                                    onChange={(event) => {
+                                        update('noteType', event.target.value)
+                                        setAudioBlob(null)
+                                        setAudioUrl(null)
+                                        setImageDataUrl(null)
+                                    }}
                                     style={inputStyle()}
                                 >
                                     <option value="texto">Texto</option>
@@ -1093,17 +1389,27 @@ export function CreateAcademicItemModal({
                                 </Field>
                             )}
 
-                            {['audio', 'imagen', 'documento'].includes(form.noteType) && (
+                            {form.noteType === 'audio' && (
+                                <AudioCapture
+                                    onAudioReady={(blob, url, duration) => {
+                                        setAudioBlob(blob)
+                                        setAudioUrl(url)
+                                        setAudioDuration(duration)
+                                    }}
+                                />
+                            )}
+
+                            {form.noteType === 'imagen' && (
+                                <ImageCapture
+                                    onImageReady={(url) => setImageDataUrl(url)}
+                                />
+                            )}
+
+                            {form.noteType === 'documento' && (
                                 <Field label="Adjunto">
                                     <input
                                         type="file"
-                                        accept={
-                                            form.noteType === 'audio'
-                                                ? 'audio/*'
-                                                : form.noteType === 'imagen'
-                                                    ? 'image/*'
-                                                    : '.pdf,.doc,.docx,.xls,.xlsx,image/*'
-                                        }
+                                        accept=".pdf,.doc,.docx,.xls,.xlsx,image/*"
                                         onChange={(event) =>
                                             update('attachmentName', event.target.files?.[0]?.name || '')
                                         }
