@@ -776,6 +776,44 @@ export default function App() {
   const addNote = async (item: any, taskId?: string | null) => {
     await dataActions.notes.upsert(normalizeNoteItem(item, taskId))
   }
+  const getReminderDateFromItem = (item: any) => {
+    if (item.type === 'tarea') {
+      return item.dueDate || item.date || ''
+    }
+
+    if (item.type === 'evento') {
+      return item.date || ''
+    }
+
+    if (item.type === 'clase') {
+      return item.date || ''
+    }
+
+    return item.date || ''
+  }
+
+  const saveLinkedReminder = async (item: any) => {
+    if (!item.reminder) return
+
+    const reminder = {
+      ...item.reminder,
+      id: item.reminder.id || createId('reminder'),
+      parentId: item.id,
+      parentType: item.type,
+      parentTitle: item.title,
+      title: item.reminder.note || item.title,
+      date: getReminderDateFromItem(item),
+      time:
+        item.type === 'tarea'
+          ? item.dueTime
+          : item.type === 'evento'
+            ? item.time
+            : item.startTime,
+      status: 'activo',
+    }
+
+    await dataActions.reminders.upsert(normalizeReminderItem(reminder))
+  }
 
   useEffect(() => {
     const el = mainRef.current
@@ -876,13 +914,28 @@ export default function App() {
             onCreated={async (item: any) => {
               if (item.type === 'evento') {
                 await dataActions.events.upsert(normalizeEventItem(item))
-                toast('Evento creado correctamente')
+                await saveLinkedReminder(item)
+                toast(
+                  item.reminder
+                    ? 'Evento y recordatorio creados correctamente'
+                    : 'Evento creado correctamente',
+                )
               } else if (item.type === 'tarea') {
                 await dataActions.tasks.upsert(normalizeTaskItem(item))
-                toast('Tarea creada correctamente')
+                await saveLinkedReminder(item)
+                toast(
+                  item.reminder
+                    ? 'Tarea y recordatorio creados correctamente'
+                    : 'Tarea creada correctamente',
+                )
               } else if (item.type === 'clase') {
                 await addCreatedClassToSchedule(item)
-                toast('Clase creada correctamente')
+                await saveLinkedReminder(item)
+                toast(
+                  item.reminder
+                    ? 'Clase y recordatorio creados correctamente'
+                    : 'Clase creada correctamente',
+                )
               }
             }}
           />
@@ -1074,33 +1127,37 @@ export default function App() {
         />
 
         <CreateAcademicItemModal
-          open={!!createModalType}
-          type={createModalType || 'evento'}
+          open={Boolean(createModalType)}
+          type={createModalType || 'tarea'}
           onClose={() => setCreateModalType(null)}
           onCreated={(item) => {
             void (async () => {
-            if (item.type === 'clase') {
-              await addCreatedClassToSchedule(item)
-            } else if (item.type === 'evento') {
-              await dataActions.events.upsert(normalizeEventItem(item))
-            } else if (item.type === 'tarea') {
-              await dataActions.tasks.upsert(normalizeTaskItem(item))
-            } else if (item.type === 'nota') {
-              if (createNoteTaskId) {
-                await addNote(item, createNoteTaskId)
-                setCreateNoteTaskId(null)
-              } else {
-                await addNote(item)
+              if (item.type === 'clase') {
+                await addCreatedClassToSchedule(item)
+                await saveLinkedReminder(item)
+              } else if (item.type === 'evento') {
+                await dataActions.events.upsert(normalizeEventItem(item))
+                await saveLinkedReminder(item)
+              } else if (item.type === 'tarea') {
+                await dataActions.tasks.upsert(normalizeTaskItem(item))
+                await saveLinkedReminder(item)
+              } else if (item.type === 'nota') {
+                if (createNoteTaskId) {
+                  await addNote(item, createNoteTaskId)
+                  setCreateNoteTaskId(null)
+                } else {
+                  await addNote(item)
+                }
               }
-            }
 
-            toast(
-              `${TYPE_LABEL_TEXT[item.type as CreateItemType]} creado correctamente`,
-            )
+              toast(
+                item.reminder
+                  ? `${TYPE_LABEL_TEXT[item.type as CreateItemType]} y recordatorio creados correctamente`
+                  : `${TYPE_LABEL_TEXT[item.type as CreateItemType]} creado correctamente`,
+              )
             })()
           }}
         />
-
         <CreateReminderModal
           open={reminderModalOpen}
           parent={reminderParent}
