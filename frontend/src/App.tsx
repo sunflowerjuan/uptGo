@@ -773,6 +773,9 @@ export default function App() {
     setRoute('schedule')
   }
 
+
+
+
   const addNote = async (item: any, taskId?: string | null) => {
     await dataActions.notes.upsert(normalizeNoteItem(item, taskId))
   }
@@ -814,7 +817,6 @@ export default function App() {
 
     await dataActions.reminders.upsert(normalizeReminderItem(reminder))
   }
-
   useEffect(() => {
     const el = mainRef.current
     if (!el) return
@@ -1130,32 +1132,32 @@ export default function App() {
           open={Boolean(createModalType)}
           type={createModalType || 'tarea'}
           onClose={() => setCreateModalType(null)}
-          onCreated={(item) => {
-            void (async () => {
-              if (item.type === 'clase') {
-                await addCreatedClassToSchedule(item)
-                await saveLinkedReminder(item)
-              } else if (item.type === 'evento') {
-                await dataActions.events.upsert(normalizeEventItem(item))
-                await saveLinkedReminder(item)
-              } else if (item.type === 'tarea') {
-                await dataActions.tasks.upsert(normalizeTaskItem(item))
-                await saveLinkedReminder(item)
-              } else if (item.type === 'nota') {
-                if (createNoteTaskId) {
-                  await addNote(item, createNoteTaskId)
-                  setCreateNoteTaskId(null)
-                } else {
-                  await addNote(item)
-                }
-              }
-
+          onCreated={async (item: any) => {
+            if (item.type === 'evento') {
+              await dataActions.events.upsert(normalizeEventItem(item))
+              await saveLinkedReminder(item)
               toast(
                 item.reminder
-                  ? `${TYPE_LABEL_TEXT[item.type as CreateItemType]} y recordatorio creados correctamente`
-                  : `${TYPE_LABEL_TEXT[item.type as CreateItemType]} creado correctamente`,
+                  ? 'Evento y recordatorio creados correctamente'
+                  : 'Evento creado correctamente',
               )
-            })()
+            } else if (item.type === 'tarea') {
+              await dataActions.tasks.upsert(normalizeTaskItem(item))
+              await saveLinkedReminder(item)
+              toast(
+                item.reminder
+                  ? 'Tarea y recordatorio creados correctamente'
+                  : 'Tarea creada correctamente',
+              )
+            } else if (item.type === 'clase') {
+              await addCreatedClassToSchedule(item)
+              await saveLinkedReminder(item)
+              toast(
+                item.reminder
+                  ? 'Clase y recordatorio creados correctamente'
+                  : 'Clase creada correctamente',
+              )
+            }
           }}
         />
         <CreateReminderModal
