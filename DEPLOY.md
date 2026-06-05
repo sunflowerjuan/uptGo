@@ -48,11 +48,11 @@ npm run test
 
 Usa dominios separados:
 
-| Servicio      | URL                       | Plataforma       |
-| ------------- | ------------------------- | ---------------- |
-| PWA frontend  | `https://uptgo.space`     | Cloudflare Pages |
-| API backend   | `https://api.uptgo.space` | Koyeb            |
-| Base de datos | URL privada Neon          | Neon Postgres    |
+| Servicio | URL | Plataforma |
+| --- | --- | --- |
+| PWA frontend | `https://uptgo.space` | Cloudflare Pages |
+| API backend | `https://api.uptgo.space` | Koyeb |
+| Base de datos | URL privada Neon | Neon Postgres |
 
 No recomiendo poner el backend en Vercel como primera opcion porque el backend actual es un servidor NestJS normal (`node dist/main`), no una API serverless adaptada. Koyeb permite ejecutar el backend casi como ya esta.
 

@@ -53,9 +53,6 @@ const DEFAULT_FORM = {
     noteType: 'texto',
     noteText: '',
     tags: '',
-    noteAttachmentName: '',
-    audioUrl: '',
-    imageUrl: '',
     repeat: 'unica',
     notifyBefore: '15',
     attachmentName: '',
@@ -457,7 +454,6 @@ export function CreateAcademicItemModal({
             date: initialDate || '',
             dueDate: initialDate || '',
         })
-        setRecording(false)
     }, [open, initialDate, type])
 
     if (!open) return null
@@ -531,67 +527,11 @@ export function CreateAcademicItemModal({
             }
         }
 
-        if (type === 'nota') {
-            if (form.noteType === 'texto' && !form.noteText.trim()) {
-                return 'Escribe el contenido de la nota.'
-            }
-
-            if (form.noteType === 'audio' && !form.audioUrl) {
-                return 'Graba un audio o sube un archivo de audio.'
-            }
-
-            if (form.noteType === 'imagen' && !form.imageUrl) {
-                return 'Toma una foto o sube una imagen.'
-            }
+        if (type === 'nota' && form.noteType === 'texto' && !form.noteText.trim()) {
+            return 'Escribe el contenido de la nota.'
         }
 
         return ''
-    }
-
-    const handleNoteFileSelected = (
-        event: React.ChangeEvent<HTMLInputElement>,
-        kind: 'audio' | 'imagen' | 'documento',
-    ) => {
-        const file = event.target.files?.[0]
-        if (!file) return
-
-        const url = URL.createObjectURL(file)
-        update('noteAttachmentName', file.name)
-        update('attachmentName', file.name)
-
-        if (kind === 'audio') update('audioUrl', url)
-        if (kind === 'imagen') update('imageUrl', url)
-
-        event.target.value = ''
-    }
-
-    const toggleRecording = async () => {
-        if (recording) {
-            mediaRecorderRef.current?.stop()
-            setRecording(false)
-            return
-        }
-
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-            const recorder = new MediaRecorder(stream)
-            audioChunksRef.current = []
-            recorder.ondataavailable = (event) => {
-                if (event.data.size > 0) audioChunksRef.current.push(event.data)
-            }
-            recorder.onstop = () => {
-                const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType || 'audio/webm' })
-                update('audioUrl', URL.createObjectURL(blob))
-                update('noteAttachmentName', `grabacion-${Date.now()}.webm`)
-                update('attachmentName', `grabacion-${Date.now()}.webm`)
-                stream.getTracks().forEach((track) => track.stop())
-            }
-            mediaRecorderRef.current = recorder
-            recorder.start()
-            setRecording(true)
-        } catch {
-            setError('No se pudo acceder al micrófono.')
-        }
     }
 
     const handleSave = () => {

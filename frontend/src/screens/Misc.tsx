@@ -5,7 +5,6 @@ import { Icon } from '../components/Icons'
 import { Avatar, Button, Card, FadeIn, SectionTitle, Sheet } from '../components/UI'
 import { useAuth } from '../contexts/AuthContext'
 import { ApiError } from '../services/api'
-import { subscribeToPush, unsubscribeFromPush, isPushSubscribed } from '../services/push.service'
 
 type AnyProps = Record<string, any>
 
@@ -238,41 +237,7 @@ function EditProfileSheet({ open, onClose, toast }: { open: boolean; onClose: ()
 
 export function Settings({ m, theme, onTheme, palette, onPalette, onLogout, toast }: AnyProps) {
   const { user, registerWebAuthn } = useAuth()
-  const [notif, setNotif] = React.useState<Record<string, boolean>>({
-    vencimiento: isPushSubscribed(),
-    clase: isPushSubscribed(),
-    recordatorio: isPushSubscribed(),
-    sync: false,
-  })
-
-  const handleNotifToggle = async (key: string, value: boolean): Promise<void> => {
-    setNotif((s) => ({ ...s, [key]: value }))
-
-    if (value) {
-      if (!isPushSubscribed()) {
-        try {
-          const id = await subscribeToPush()
-          if (!id) {
-            setNotif((s) => ({ ...s, [key]: false }))
-            ;(toast as (msg: string) => void)(
-              'No se pudo activar notificaciones. Verifica los permisos del navegador.',
-            )
-          }
-        } catch {
-          setNotif((s) => ({ ...s, [key]: false }))
-          ;(toast as (msg: string) => void)('Error al activar notificaciones push.')
-        }
-      }
-    } else {
-      const newState = { ...notif, [key]: false }
-      const allOff = Object.entries(newState)
-        .filter(([k]) => k !== 'sync')
-        .every(([, v]) => !v)
-      if (allOff) {
-        await unsubscribeFromPush().catch(() => {})
-      }
-    }
-  }
+  const [notif, setNotif] = React.useState<Record<string, boolean>>({ vencimiento: true, clase: true, recordatorio: true, sync: false })
   const [lang, setLang] = React.useState('es')
   const [editOpen, setEditOpen] = React.useState(false)
 
@@ -463,10 +428,7 @@ export function Settings({ m, theme, onTheme, palette, onPalette, onLogout, toas
             ['sync', 'cloudCheck', 'Sincronización completada'],
           ].map(([k, ic, label], i, arr) => (
             <SettingRow key={k} icon={ic} title={label} last={i === arr.length - 1}>
-              <ToggleSwitch
-                on={notif[k]}
-                onChange={(v: boolean) => void handleNotifToggle(k, v)}
-              />
+              <ToggleSwitch on={notif[k]} onChange={(v: boolean) => setNotif((s) => ({ ...s, [k]: v }))} />
             </SettingRow>
           ))}
         </Card>

@@ -3,8 +3,6 @@ import { DATA } from '../data/data'
 import { CreateAcademicItemModal, type CreateItemType, } from '../components/CreateAcademicItemModal'
 import { Button, Card, EmptyState, FadeIn, IconButton, Pill, SectionTitle, cSoftVar, cVar, subjectById, } from '../components/UI'
 import { Icon } from '../components/Icons'
-import type { DbEvent, DbScheduleBlock } from '../services/db'
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyProps = Record<string, any>
 
 // ---- CSV PARSER TYPES ----
@@ -357,8 +355,7 @@ const DAY_MARKS: Record<number, number[]> = {
   27: [1, 4],
 }
 
-export function Calendar({ m, onAdd, events: eventsProp }: AnyProps) {
-  const userEvents: DbEvent[] = (eventsProp as DbEvent[] | undefined) ?? []
+export function Calendar({ m, onAdd }: AnyProps) {
   const [view, setView] = React.useState<'mes' | 'agenda'>('mes')
   const [sel, setSel] = React.useState(8)
   const [popupDay, setPopupDay] = React.useState<number | null>(null)
@@ -410,37 +407,19 @@ export function Calendar({ m, onAdd, events: eventsProp }: AnyProps) {
   const agendaDay = (day: number) => {
     const items: any[] = []
 
-    // Always render user-created events for this day based on date match
-    const dayStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-    const userDayEvents = userEvents
-      .filter((e: DbEvent) => e.date === dayStr)
-      .map((e: DbEvent) => ({
-        time: e.time,
-        title: e.title,
-        sub: e.loc ?? '',
-        color: subjectById(e.subject).color,
-        type: e.type ?? 'evento',
-      }))
-
-    if (userDayEvents.length > 0) {
-      return userDayEvents
-    }
-
     if (!isMockMonth) {
       return items
     }
 
     if (DAY_MARKS[day]) {
       if (day === 8) {
-        return userEvents
-          .filter((e: DbEvent) => e.date === dayStr)
-          .map((e: DbEvent) => ({
-            time: e.time,
-            title: e.title,
-            sub: e.loc ?? '',
-            color: subjectById(e.subject).color,
-            type: e.type ?? 'evento',
-          }))
+        return DATA.events.map((event: any) => ({
+          time: event.time,
+          title: event.title,
+          sub: event.loc,
+          color: subjectById(event.subject).color,
+          type: 'evento',
+        }))
       }
 
       DAY_MARKS[day].forEach((color, index) => {
