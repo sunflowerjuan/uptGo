@@ -1,28 +1,25 @@
 import { DATA } from './data/data'
 import { useEffect, useRef, useState } from 'react'
+import { useRegisterSW } from 'virtual:pwa-register/react'
+import { useAuth } from './contexts/AuthContext'
 import { Icon } from './components/Icons'
-import { Logo } from './components/Logo'
 import { Sheet, EmptyState, cSoftVar, cVar } from './components/UI'
 import { TopBar, Sidebar, BottomNav, MenuSheet } from './components/Nav'
-import {
-  TweaksPanel,
-  TweakSection,
-  TweakRadio,
-  TweakToggle,
-  TweakColor,
-  useTweaks,
-} from './components/TweaksPanel'
-
-import { Login, ErrorScreen } from './screens/Auth'
+import { useTweaks } from './components/TweaksPanel'
+import { Login, ErrorScreen, CompleteProfileModal } from './screens/Auth'
 import { Dashboard } from './screens/Dashboard'
 import { Tasks, TaskDetail } from './screens/Tasks'
 import { Calendar, Schedule } from './screens/Calendar'
 import { Notes, Reminders } from './screens/Notes'
+import { CampusMap, Settings, Pomodoro } from './screens/Misc'
 import {
-  CampusMap,
-  Settings,
-  Pomodoro,
-} from './screens/Misc'
+  CreateReminderModal,
+  type ReminderParent,
+} from './components/CreateReminderModal'
+import {
+  CreateAcademicItemModal,
+  type CreateItemType,
+} from './components/CreateAcademicItemModal'
 
 import './styles/theme.css'
 
@@ -44,7 +41,6 @@ type TweakValues = {
   palette: 'verde' | 'cobalto' | 'arcilla'
   dark: boolean
   navStyle: 'sidebar' | 'rail' | 'top'
-  device: 'mobile' | 'desktop'
   homeVariant: 'resumen' | 'enfoque'
   online: boolean
 }
@@ -53,9 +49,6 @@ declare global {
   interface Window {
     __UPTGO_MOBILE__?: boolean
   }
-}
-type StatusBarProps = {
-  online: boolean
 }
 
 type ToastProps = {
@@ -77,130 +70,498 @@ type NotifSheetProps = {
 type QuickAddSheetProps = {
   open: boolean
   onClose: () => void
-  toast: (msg: string) => void
-}
-
-function StatusBar({ online }: StatusBarProps) {
-  return (
-    <div style={{ height: 34, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 22px', flexShrink: 0, background: 'var(--surface)', color: 'var(--text)' }}>
-      <span style={{ fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-display)' }}>9:41</span>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <Icon name={online ? 'globe' : 'wifiOff'} size={14} color="var(--text)" />
-        <svg width="22" height="12" viewBox="0 0 24 12" fill="none"><rect x="1" y="1" width="19" height="10" rx="3" stroke="var(--text)" strokeWidth="1.2" opacity="0.5" /><rect x="3" y="3" width="13" height="6" rx="1.5" fill="var(--text)" /><rect x="21" y="4" width="2" height="4" rx="1" fill="var(--text)" opacity="0.5" /></svg>
-      </div>
-    </div>
-  );
-}
-
-function Toast({ msg }: ToastProps) {
-  return (
-    <div style={{
-      position: 'absolute', bottom: 96, left: '50%', transform: `translateX(-50%) translateY(${msg ? 0 : 16}px)`,
-      opacity: msg ? 1 : 0, pointerEvents: 'none', transition: 'all .3s var(--ease)', zIndex: 80,
-      background: 'var(--text)', color: 'var(--bg)', padding: '11px 18px', borderRadius: 'var(--r-full)',
-      fontSize: 13, fontWeight: 500, boxShadow: 'var(--shadow-lg)', display: 'flex', alignItems: 'center', gap: 8, maxWidth: '88%',
-    }}>
-      <Icon name="check" size={15} color="var(--bg)" stroke={2.4} />{msg}
-    </div>
-  );
-}
-
-function SearchSheet({ open, onClose, go, onOpenTask }: SearchSheetProps) {
-  const [q, setQ] = useState('');
-  const inputRef = useRef<HTMLInputElement | null>(null)
-  useEffect(() => {
-    if (open && inputRef.current) {
-      inputRef.current.focus({ preventScroll: true })
-    }
-  }, [open])
-  const tasks = DATA.tasks.filter(t => t.title.toLowerCase().includes(q.toLowerCase()));
-  const notes = DATA.notes.filter(n => n.title.toLowerCase().includes(q.toLowerCase()));
-  return (
-    <Sheet open={open} onClose={onClose} title="Buscar">
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 14px', height: 48, background: 'var(--surface-2)', borderRadius: 'var(--r-sm)', border: '1px solid var(--border)' }}>
-        <Icon name="search" size={17} color="var(--text-3)" />
-        <input ref={inputRef} placeholder="Tareas, notas, materias…" value={q} onChange={e => setQ(e.target.value)} style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontFamily: 'var(--font-ui)', fontSize: 14, color: 'var(--text)' }} />
-      </div>
-      <div style={{ marginTop: 16 }}>
-        {q && tasks.length === 0 && notes.length === 0 && <EmptyState icon="search" title="Sin resultados" body={`Nada coincide con "${q}".`} />}
-        {tasks.length > 0 && <div style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-3)', marginBottom: 8 }}>Tareas</div>}
-        {tasks.slice(0, 4).map(t => (
-          <button key={t.id} onClick={() => { onClose(); onOpenTask(t.id); }} style={{ display: 'flex', alignItems: 'center', gap: 11, width: '100%', padding: '11px 6px', background: 'none', border: 'none', borderBottom: '1px solid var(--border)', cursor: 'pointer', textAlign: 'left' }}>
-            <Icon name="tasks" size={17} color="var(--text-3)" /><span style={{ fontSize: 13.5, color: 'var(--text)' }}>{t.title}</span>
-          </button>
-        ))}
-        {notes.length > 0 && <div style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-3)', margin: '14px 0 8px' }}>Notas</div>}
-        {notes.slice(0, 4).map(n => (
-          <button key={n.id} onClick={() => { onClose(); go('notes'); }} style={{ display: 'flex', alignItems: 'center', gap: 11, width: '100%', padding: '11px 6px', background: 'none', border: 'none', borderBottom: '1px solid var(--border)', cursor: 'pointer', textAlign: 'left' }}>
-            <Icon name="notes" size={17} color="var(--text-3)" /><span style={{ fontSize: 13.5, color: 'var(--text)' }}>{n.title}</span>
-          </button>
-        ))}
-      </div>
-    </Sheet>
-  );
-}
-
-function NotifSheet({ open, onClose }: NotifSheetProps) {
-  return (
-    <Sheet open={open} onClose={onClose} title="Notificaciones">
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {DATA.notifications.map(n => (
-          <div key={n.id} style={{ display: 'flex', gap: 12, padding: '13px', borderRadius: 'var(--r-md)', background: n.unread ? 'var(--primary-soft)' : 'var(--surface-2)', border: '1px solid var(--border)' }}>
-            <span style={{ width: 36, height: 36, borderRadius: 'var(--r-sm)', background: cSoftVar(n.color), color: cVar(n.color), display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Icon name={n.icon} size={17} /></span>
-            <div style={{ flex: 1 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text)' }}>{n.title}</span>
-                <span style={{ fontSize: 11, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>{n.time}</span>
-              </div>
-              <div style={{ fontSize: 12.5, color: 'var(--text-2)', marginTop: 2, lineHeight: 1.45 }}>{n.body}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </Sheet>
-  );
-}
-
-function QuickAddSheet({ open, onClose, toast }: QuickAddSheetProps) {
-  const opts: Array<[string, string, string, number]> = [
-    ['tasks', 'Tarea', 'Nueva tarea académica', 1],
-    ['notes', 'Nota', 'Texto, audio o foto', 2],
-    ['bell', 'Recordatorio', 'Con notificación push', 5],
-    ['calendar', 'Evento', 'En tu calendario', 3],
-  ]
-  return (
-    <Sheet open={open} onClose={onClose} title="Crear">
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 11 }}>
-        {opts.map(([ic, label, sub, c]) => (
-          <button key={label} onClick={() => { onClose(); toast(`Crear ${label.toLowerCase()}`); }} style={{
-            display: 'flex', flexDirection: 'column', gap: 8, padding: '18px 16px', textAlign: 'left',
-            background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', cursor: 'pointer',
-          }}>
-            <span style={{ width: 40, height: 40, borderRadius: 'var(--r-sm)', background: cSoftVar(c), color: cVar(c), display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name={ic} size={20} /></span>
-            <div><div style={{ fontSize: 14.5, fontWeight: 600, color: 'var(--text)' }}>{label}</div><div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>{sub}</div></div>
-          </button>
-        ))}
-      </div>
-    </Sheet>
-  );
+  onPickType: (type: CreateItemType) => void
 }
 
 const TWEAK_DEFAULTS: TweakValues = {
   palette: 'verde',
   dark: false,
   navStyle: 'sidebar',
-  device: 'mobile',
   homeVariant: 'resumen',
   online: true,
 }
 
+const TYPE_LABEL_TEXT: Record<CreateItemType, string> = {
+  evento: 'Evento',
+  tarea: 'Tarea',
+  clase: 'Clase',
+  nota: 'Nota',
+}
+
+const DAY_INDEX: Record<string, number> = {
+  Lun: 0,
+  Mar: 1,
+  Mié: 2,
+  Jue: 3,
+  Vie: 4,
+  Sáb: 5,
+  Dom: 6,
+}
+
+function useIsMobile(breakpoint = 820) {
+  const getIsMobile = () => {
+    if (typeof window === 'undefined') return false
+    return window.matchMedia(`(max-width: ${breakpoint}px)`).matches
+  }
+
+  const [isMobile, setIsMobile] = useState(getIsMobile)
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia(`(max-width: ${breakpoint}px)`)
+
+    const handleChange = (event: MediaQueryListEvent) => {
+      setIsMobile(event.matches)
+    }
+
+    setIsMobile(mediaQuery.matches)
+    mediaQuery.addEventListener('change', handleChange)
+
+    return () => {
+      mediaQuery.removeEventListener('change', handleChange)
+    }
+  }, [breakpoint])
+
+  return isMobile
+}
+
+function Toast({ msg }: ToastProps) {
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        bottom: 96,
+        left: '50%',
+        transform: `translateX(-50%) translateY(${msg ? 0 : 16}px)`,
+        opacity: msg ? 1 : 0,
+        pointerEvents: 'none',
+        transition: 'all .3s var(--ease)',
+        zIndex: 80,
+        background: 'var(--text)',
+        color: 'var(--bg)',
+        padding: '11px 18px',
+        borderRadius: 'var(--r-full)',
+        fontSize: 13,
+        fontWeight: 500,
+        boxShadow: 'var(--shadow-lg)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        maxWidth: '88%',
+      }}
+    >
+      <Icon name="check" size={15} color="var(--bg)" stroke={2.4} />
+      {msg}
+    </div>
+  )
+}
+
+type UpdateBannerProps = {
+  onUpdate: () => void
+  onDismiss: () => void
+}
+
+function UpdateBanner({ onUpdate, onDismiss }: UpdateBannerProps) {
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        bottom: 24,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        zIndex: 90,
+        background: 'var(--surface)',
+        border: '1px solid var(--border-strong)',
+        borderRadius: 'var(--r-lg)',
+        boxShadow: 'var(--shadow-pop)',
+        padding: '14px 18px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 14,
+        maxWidth: 'calc(100vw - 32px)',
+        width: 'max-content',
+      }}
+    >
+      <Icon name="download" size={18} color="var(--primary)" />
+      <span
+        style={{
+          fontSize: 13.5,
+          fontWeight: 500,
+          color: 'var(--text)',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        Nueva versión disponible
+      </span>
+      <div style={{ display: 'flex', gap: 8, marginLeft: 4 }}>
+        <button
+          onClick={onUpdate}
+          style={{
+            padding: '6px 14px',
+            borderRadius: 'var(--r-full)',
+            background: 'var(--primary)',
+            color: 'var(--on-primary)',
+            border: 'none',
+            fontFamily: 'var(--font-ui)',
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          Actualizar
+        </button>
+        <button
+          onClick={onDismiss}
+          style={{
+            padding: '6px 10px',
+            borderRadius: 'var(--r-full)',
+            background: 'transparent',
+            color: 'var(--text-3)',
+            border: '1px solid var(--border)',
+            fontFamily: 'var(--font-ui)',
+            fontSize: 13,
+            cursor: 'pointer',
+          }}
+        >
+          Más tarde
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function SearchSheet({ open, onClose, go, onOpenTask }: SearchSheetProps) {
+  const [q, setQ] = useState('')
+  const inputRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    if (open && inputRef.current) {
+      inputRef.current.focus({ preventScroll: true })
+    }
+  }, [open])
+
+  const tasks = DATA.tasks.filter((task) =>
+    task.title.toLowerCase().includes(q.toLowerCase()),
+  )
+
+  const notes = DATA.notes.filter((note) =>
+    note.title.toLowerCase().includes(q.toLowerCase()),
+  )
+
+  return (
+    <Sheet open={open} onClose={onClose} title="Buscar">
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          padding: '0 14px',
+          height: 48,
+          background: 'var(--surface-2)',
+          borderRadius: 'var(--r-sm)',
+          border: '1px solid var(--border)',
+        }}
+      >
+        <Icon name="search" size={17} color="var(--text-3)" />
+
+        <input
+          ref={inputRef}
+          placeholder="Tareas, notas, materias…"
+          value={q}
+          onChange={(event) => setQ(event.target.value)}
+          style={{
+            flex: 1,
+            border: 'none',
+            background: 'transparent',
+            outline: 'none',
+            fontFamily: 'var(--font-ui)',
+            fontSize: 14,
+            color: 'var(--text)',
+          }}
+        />
+      </div>
+
+      <div style={{ marginTop: 16 }}>
+        {q && tasks.length === 0 && notes.length === 0 && (
+          <EmptyState
+            icon="search"
+            title="Sin resultados"
+            body={`Nada coincide con "${q}".`}
+          />
+        )}
+
+        {tasks.length > 0 && (
+          <div
+            style={{
+              fontSize: 11.5,
+              fontWeight: 600,
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+              color: 'var(--text-3)',
+              marginBottom: 8,
+            }}
+          >
+            Tareas
+          </div>
+        )}
+
+        {tasks.slice(0, 4).map((task) => (
+          <button
+            key={task.id}
+            onClick={() => {
+              onClose()
+              onOpenTask(task.id)
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 11,
+              width: '100%',
+              padding: '11px 6px',
+              background: 'none',
+              border: 'none',
+              borderBottom: '1px solid var(--border)',
+              cursor: 'pointer',
+              textAlign: 'left',
+            }}
+          >
+            <Icon name="tasks" size={17} color="var(--text-3)" />
+            <span style={{ fontSize: 13.5, color: 'var(--text)' }}>
+              {task.title}
+            </span>
+          </button>
+        ))}
+
+        {notes.length > 0 && (
+          <div
+            style={{
+              fontSize: 11.5,
+              fontWeight: 600,
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+              color: 'var(--text-3)',
+              margin: '14px 0 8px',
+            }}
+          >
+            Notas
+          </div>
+        )}
+
+        {notes.slice(0, 4).map((note) => (
+          <button
+            key={note.id}
+            onClick={() => {
+              onClose()
+              go('notes')
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 11,
+              width: '100%',
+              padding: '11px 6px',
+              background: 'none',
+              border: 'none',
+              borderBottom: '1px solid var(--border)',
+              cursor: 'pointer',
+              textAlign: 'left',
+            }}
+          >
+            <Icon name="notes" size={17} color="var(--text-3)" />
+            <span style={{ fontSize: 13.5, color: 'var(--text)' }}>
+              {note.title}
+            </span>
+          </button>
+        ))}
+      </div>
+    </Sheet>
+  )
+}
+
+function NotifSheet({ open, onClose }: NotifSheetProps) {
+  return (
+    <Sheet open={open} onClose={onClose} title="Notificaciones">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {DATA.notifications.map((notification) => (
+          <div
+            key={notification.id}
+            style={{
+              display: 'flex',
+              gap: 12,
+              padding: '13px',
+              borderRadius: 'var(--r-md)',
+              background: notification.unread
+                ? 'var(--primary-soft)'
+                : 'var(--surface-2)',
+              border: '1px solid var(--border)',
+            }}
+          >
+            <span
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 'var(--r-sm)',
+                background: cSoftVar(notification.color),
+                color: cVar(notification.color),
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <Icon name={notification.icon} size={17} />
+            </span>
+
+            <div style={{ flex: 1 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  gap: 8,
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 13.5,
+                    fontWeight: 600,
+                    color: 'var(--text)',
+                  }}
+                >
+                  {notification.title}
+                </span>
+
+                <span
+                  style={{
+                    fontSize: 11,
+                    color: 'var(--text-3)',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {notification.time}
+                </span>
+              </div>
+
+              <div
+                style={{
+                  fontSize: 12.5,
+                  color: 'var(--text-2)',
+                  marginTop: 2,
+                  lineHeight: 1.45,
+                }}
+              >
+                {notification.body}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Sheet>
+  )
+}
+
+function QuickAddSheet({ open, onClose, onPickType }: QuickAddSheetProps) {
+  const opts: Array<[string, string, string, number, CreateItemType]> = [
+    ['calendar', 'Evento', 'En tu calendario', 3, 'evento'],
+    ['tasks', 'Tarea', 'Nueva tarea académica', 1, 'tarea'],
+    ['clock', 'Clase', 'Horario académico', 2, 'clase'],
+    ['notes', 'Nota', 'Texto, audio o foto', 4, 'nota'],
+  ]
+
+  return (
+    <Sheet open={open} onClose={onClose} title="Crear nuevo">
+      <div className="uptgo-sheet-grid">
+        {opts.map(([ic, label, sub, color, type]) => (
+          <button
+            key={label}
+            onClick={() => {
+              onClose()
+              onPickType(type)
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 12,
+              padding: '16px 14px',
+              textAlign: 'left',
+              background: 'var(--surface-2)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--r-md)',
+              cursor: 'pointer',
+              color: 'var(--text)',
+            }}
+          >
+            <span
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: 'var(--r-md)',
+                background: cSoftVar(color),
+                color: cVar(color),
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <Icon name={ic} size={18} />
+            </span>
+
+            <span style={{ minWidth: 0 }}>
+              <strong
+                style={{
+                  display: 'block',
+                  fontSize: 14,
+                  color: 'var(--text)',
+                  marginBottom: 3,
+                }}
+              >
+                {label}
+              </strong>
+
+              <span
+                style={{
+                  display: 'block',
+                  fontSize: 12.5,
+                  color: 'var(--text-2)',
+                  lineHeight: 1.35,
+                }}
+              >
+                {sub}
+              </span>
+            </span>
+          </button>
+        ))}
+      </div>
+    </Sheet>
+  )
+}
+
 export default function App() {
   const [t, setTweak] = useTweaks<TweakValues>(TWEAK_DEFAULTS)
-  const theme = t.dark ? 'dark' : 'light';
-  const isMobile = t.device === 'mobile';
-  window.__UPTGO_MOBILE__ = isMobile;
+  const theme = t.dark ? 'dark' : 'light'
+  const isMobile = useIsMobile()
 
-  const [authed, setAuthed] = useState(() => localStorage.getItem('uptgo_auth') === '1');
+  window.__UPTGO_MOBILE__ = isMobile
+
+  const [updateDismissed, setUpdateDismissed] = useState(false)
+  const {
+    needRefresh: [needRefresh],
+    updateServiceWorker,
+  } = useRegisterSW()
+
+  const [reminderModalOpen, setReminderModalOpen] = useState(false)
+  const [reminderParent, setReminderParent] = useState<ReminderParent | null>(null)
+  const [createdScheduleBlocks, setCreatedScheduleBlocks] = useState<any[]>([])
+  const [notes, setNotes] = useState<any[]>(DATA.notes as any[])
+  const [taskNotesMap, setTaskNotesMap] = useState<Record<string, any[]>>({})
+  const [createNoteTaskId, setCreateNoteTaskId] = useState<string | null>(null)
+  const mainRef = useRef<HTMLElement | null>(null)
+  const [headerCollapsed, setHeaderCollapsed] = useState(false)
+  const lastScrollY = useRef(0)
+
+  const { isAuthenticated, user: authUser, logout: authLogout, handleOAuthCallback, needsProfileCompletion } = useAuth()
+  const [profilePromptDismissed, setProfilePromptDismissed] = useState(false)
+
   const [route, setRoute] = useState<AppRoute>(() => {
     const savedRoute = localStorage.getItem('uptgo_route') as AppRoute | null
     return savedRoute || 'dashboard'
@@ -211,22 +572,26 @@ export default function App() {
   const [reminders, setReminders] = useState(DATA.reminders)
   const [sheet, setSheet] = useState<SheetType>(null)
   const [toastMsg, setToastMsg] = useState('')
+  const [createModalType, setCreateModalType] = useState<CreateItemType | null>(
+    null,
+  )
+
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  useEffect(() => { localStorage.setItem('uptgo_route', route); }, [route]);
-  const login = () => {
-    setAuthed(true)
-    localStorage.setItem('uptgo_auth', '1')
-    go('dashboard')
-  }
+  useEffect(() => {
+    localStorage.setItem('uptgo_route', route)
+  }, [route])
 
-  const logout = () => {
-    setAuthed(false)
-    localStorage.removeItem('uptgo_auth')
-    setOpenTaskId(null)
-    setSheet(null)
-    go('dashboard')
-  }
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const accessToken = params.get('accessToken')
+    const refreshToken = params.get('refreshToken')
+    if (accessToken && refreshToken) {
+      void handleOAuthCallback(accessToken, refreshToken).then(() => go('dashboard'))
+      window.history.replaceState({}, document.title, window.location.pathname)
+    }
+  }, [])
+
   const toast = (message: string) => {
     setToastMsg(message)
 
@@ -242,9 +607,117 @@ export default function App() {
     setRoute(nextRoute as AppRoute)
   }
 
+  const handleLoginSuccess = () => {
+    go('dashboard')
+  }
+
+  const logout = () => {
+    authLogout()
+    setOpenTaskId(null)
+    setSheet(null)
+    setCreateModalType(null)
+    setReminderModalOpen(false)
+    setReminderParent(null)
+    go('dashboard')
+  }
+
   const openTask = (id: string | number) => {
     setOpenTaskId(id)
     setRoute('tasks')
+  }
+
+  const openReminderModal = (parent?: ReminderParent | null) => {
+    setReminderParent(parent || null)
+    setReminderModalOpen(true)
+  }
+
+  const hourToNumber = (time: string) => {
+    const [hour] = time.split(':')
+    return Number(hour)
+  }
+
+  const addCreatedClassToSchedule = (item: any) => {
+    if (item.type !== 'clase') return
+
+    const subjectColor =
+      item.subjectMode === 'new'
+        ? ((createdScheduleBlocks.length % 6) + 1)
+        : undefined
+
+    const subjectData =
+      item.subjectMode === 'new'
+        ? {
+          ...(item.subjectData || {}),
+          color: subjectColor,
+        }
+        : null
+
+    const subjectId =
+      item.subjectMode === 'new'
+        ? subjectData?.id
+        : item.subject
+
+    const blocks = (item.days || [])
+      .map((day: string) => ({
+        id: `${item.id}-${day}`,
+        day: DAY_INDEX[day],
+        start: hourToNumber(item.startTime),
+        end: hourToNumber(item.endTime),
+        subject: subjectId,
+        title: item.title,
+        room: item.room || item.location || 'Sin aula',
+        location: item.location || '',
+        locationUrl: item.locationUrl || '',
+        teacher: subjectData?.teacher || '',
+        created: true,
+        subjectData,
+      }))
+      .filter((block: any) => block.day !== undefined)
+
+    setCreatedScheduleBlocks((current) => [...blocks, ...current])
+    setRoute('schedule')
+  }
+  const addNote = (item: any) => {
+    const noteType = item.noteType || 'texto'
+    const normalizedType = noteType === 'imagen' ? 'foto' : noteType
+    const newNote = {
+      id: item.id,
+      title: item.title,
+      subject: item.subject || '',
+      type: normalizedType,
+      noteType,
+      date: new Date().toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }),
+      tags: typeof item.tags === 'string'
+        ? item.tags.split(',').map((t: string) => t.trim()).filter(Boolean)
+        : (item.tags || []),
+      preview: item.noteText || item.attachmentName || '',
+      noteText: item.noteText || '',
+      duration: item.duration || '',
+      audioUrl: item.audioUrl || null,
+      imageUrl: item.imageUrl || null,
+      location: item.location || '',
+    }
+    setNotes((prev) => [newNote, ...prev])
+  }
+
+  useEffect(() => {
+    const el = mainRef.current
+    if (!el) return
+    const handler = () => {
+      const currentY = el.scrollTop
+      if (currentY > lastScrollY.current + 8) {
+        setHeaderCollapsed(true)
+      } else if (currentY < lastScrollY.current - 8) {
+        setHeaderCollapsed(false)
+      }
+      lastScrollY.current = currentY
+    }
+    el.addEventListener('scroll', handler, { passive: true })
+    return () => el.removeEventListener('scroll', handler)
+  }, [])
+
+  const updateTask = (id: string | number, changes: Record<string, unknown>) => {
+    setTasks((prev: any[]) => prev.map((t: any) => (t.id === id ? { ...t, ...changes } : t)))
   }
 
   const toggleTask = (id: string | number) => {
@@ -273,150 +746,331 @@ export default function App() {
       ),
     )
   }
-  const unread = DATA.notifications.filter(n => n.unread).length;
-  const online = t.online;
 
-  let screen;
+  const unread = DATA.notifications.filter((notification) => notification.unread)
+    .length
+
+  const online = t.online
+  const isError = route === 'offline' || route === 'notfound'
+
+  let screen
+
   if (route === 'offline' || route === 'notfound') {
-    screen = <ErrorScreen kind={route === 'offline' ? 'offline' : 'notfound'} onRetry={() => { setTweak('online', true); go('dashboard'); }} onHome={() => go('dashboard')} />;
+    screen = (
+      <ErrorScreen
+        kind={route === 'offline' ? 'offline' : 'notfound'}
+        onRetry={() => {
+          setTweak('online', true)
+          go('dashboard')
+        }}
+        onHome={() => go('dashboard')}
+      />
+    )
   } else if (openTaskId) {
-    screen = <TaskDetail m={isMobile} task={tasks.find(x => x.id === openTaskId)} onBack={() => setOpenTaskId(null)} onToggle={toggleTask} toast={toast} />;
+    screen = (
+      <TaskDetail
+        m={isMobile}
+        task={tasks.find((task) => task.id === openTaskId)}
+        onBack={() => setOpenTaskId(null)}
+        onToggle={toggleTask}
+        toast={toast}
+        onCreateReminder={openReminderModal}
+        taskNotes={taskNotesMap[String(openTaskId)] || []}
+        onAddNote={() => {
+          setCreateNoteTaskId(String(openTaskId))
+          setCreateModalType('nota')
+        }}
+        onUpdateTask={updateTask}
+      />
+    )
   } else {
     switch (route) {
-      case 'tasks': screen = <Tasks m={isMobile} tasks={tasks} onToggle={toggleTask} onOpenTask={openTask} onAdd={() => setSheet('add')} />; break;
-      case 'calendar': screen = <Calendar m={isMobile} go={go} onAdd={() => setSheet('add')} />; break;
-      case 'schedule': screen = <Schedule m={isMobile} onAdd={() => setSheet('add')} toast={toast} />; break;
-      case 'notes': screen = <Notes m={isMobile} onAdd={() => setSheet('add')} toast={toast} />; break;
-      case 'reminders': screen = <Reminders m={isMobile} reminders={reminders} onToggle={toggleReminder} onAdd={() => setSheet('add')} onPomodoro={() => setSheet('pomodoro')} />; break;
-      case 'map': screen = <CampusMap m={isMobile} toast={toast} />; break;
-      case 'settings': screen = <Settings m={isMobile} theme={theme} onTheme={() => setTweak('dark', !t.dark)} palette={t.palette} onPalette={(p: TweakValues['palette']) => setTweak('palette', p)} onLogout={logout} toast={toast} />; break;
-      default: screen = <Dashboard m={isMobile} go={go} tasks={tasks} onToggle={toggleTask} onOpenTask={openTask} variant={t.homeVariant} />;
+      case 'tasks':
+        screen = (
+          <Tasks
+            m={isMobile}
+            tasks={tasks}
+            onToggle={toggleTask}
+            onOpenTask={openTask}
+            onAdd={() => setCreateModalType('tarea')}
+          />
+        )
+        break
+
+      case 'calendar':
+        screen = (
+          <Calendar
+            m={isMobile}
+            go={go}
+            onAdd={() => setCreateModalType('evento')}
+          />
+        )
+        break
+
+      case 'schedule':
+        screen = (
+          <Schedule
+            m={isMobile}
+            scheduleItems={createdScheduleBlocks}
+            onAdd={() => setCreateModalType('clase')}
+            toast={toast}
+            onImportSchedule={(blocks: any[]) => setCreatedScheduleBlocks((prev) => [...blocks, ...prev])}
+          />
+        )
+        break
+
+      case 'notes':
+        screen = (
+          <Notes
+            m={isMobile}
+            onAdd={() => setCreateModalType('nota')}
+            toast={toast}
+            notes={notes}
+            onDeleteNote={(id: string) => setNotes((prev: any[]) => prev.filter((n: any) => n.id !== id))}
+          />
+        )
+        break
+
+      case 'reminders':
+        screen = (
+          <Reminders
+            m={isMobile}
+            reminders={reminders}
+            onToggle={toggleReminder}
+            onAdd={() => openReminderModal(null)}
+            toast={toast}
+          />
+        )
+        break
+
+      case 'map':
+        screen = <CampusMap m={isMobile} toast={toast} />
+        break
+
+      case 'settings':
+        screen = (
+          <Settings
+            m={isMobile}
+            theme={theme}
+            onTheme={() => setTweak('dark', !t.dark)}
+            palette={t.palette}
+            onPalette={(palette: TweakValues['palette']) =>
+              setTweak('palette', palette)
+            }
+            onLogout={logout}
+            toast={toast}
+          />
+        )
+        break
+
+      default:
+        screen = (
+          <Dashboard
+            m={isMobile}
+            go={go}
+            tasks={tasks}
+            onToggle={toggleTask}
+            onOpenTask={openTask}
+            variant={t.homeVariant}
+          />
+        )
     }
   }
 
-  const isError = route === 'offline' || route === 'notfound';
-  const mainPad = isMobile ? 'var(--space-pad-mobile)' : 'var(--space-pad-desk)';
+  const displayUser = authUser
+    ? { ...DATA.user, name: authUser.name, email: authUser.email, initials: authUser.initials ?? authUser.name.slice(0, 2).toUpperCase(), program: authUser.program ?? DATA.user.program, short: authUser.name.split(' ')[0], photo: localStorage.getItem('uptgo_user_avatar') }
+    : DATA.user
 
-  const appInner = !authed ? (
-    <div style={{ position: 'absolute', inset: 0, overflow: 'auto' }}><Login onLogin={login} /></div>
+  const appInner = !isAuthenticated ? (
+    <Login onLogin={handleLoginSuccess} />
   ) : (
-    <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg)' }}>
-      {!isError && <TopBar isMobile={isMobile} navStyle={t.navStyle} route={route} go={go} user={DATA.user} online={online}
-        onSearch={() => setSheet('search')} onNotif={() => setSheet('notif')} onMenu={() => setSheet('menu')}
-        onTheme={() => setTweak('dark', !t.dark)} theme={theme} unread={unread} />}
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
-        {!isMobile && !isError && t.navStyle !== 'top' && <Sidebar route={route} go={go} rail={t.navStyle === 'rail'} user={DATA.user} onPomodoro={() => setSheet('pomodoro')} />}
-        <main style={{ flex: 1, minWidth: 0, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', background: 'var(--bg)' }}>
-          {!online && !isError && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '9px 16px', background: 'var(--warn-soft)', color: 'var(--warn)', fontSize: 12.5, cursor: 'pointer' }} onClick={() => go('offline')}>
-              <Icon name="wifiOff" size={15} /><span><strong>Modo sin conexión.</strong> Tus datos están disponibles localmente · se sincronizarán al reconectar.</span>
-            </div>
-          )}
-          <div style={{ padding: isError ? 0 : mainPad, maxWidth: isError ? 'none' : 1180, margin: '0 auto', width: '100%', minHeight: isError ? '100%' : 'auto' }}>
+    <div className={isMobile ? 'uptgo-mobile-shell' : 'uptgo-desktop-shell'}>
+      {!isError && !isMobile && t.navStyle !== 'top' && (
+        <Sidebar
+          route={route}
+          go={go}
+          rail={t.navStyle === 'rail'}
+          user={displayUser}
+          onPomodoro={() => setSheet('pomodoro')}
+        />
+      )}
+
+      <div className="uptgo-main-shell">
+        {!isError && (
+          <TopBar
+            isMobile={isMobile}
+            navStyle={t.navStyle}
+            route={route}
+            go={go}
+            user={displayUser}
+            online={online}
+            onSearch={() => setSheet('search')}
+            onNotif={() => setSheet('notif')}
+            onMenu={() => setSheet('menu')}
+            onTheme={() => setTweak('dark', !t.dark)}
+            theme={theme}
+            unread={unread}
+            collapsed={headerCollapsed}
+          />
+        )}
+
+        {!online && !isError && (
+          <button
+            onClick={() => go('offline')}
+            style={{
+              margin: isMobile ? '10px 14px 0' : '12px 28px 0',
+              padding: '10px 14px',
+              borderRadius: 'var(--r-md)',
+              border: '1px solid var(--warn)',
+              background: 'var(--warn-soft)',
+              color: 'var(--text)',
+              fontFamily: 'var(--font-ui)',
+              fontSize: 13,
+              cursor: 'pointer',
+              textAlign: 'left',
+            }}
+          >
+            Modo sin conexión. Tus datos están disponibles localmente · se
+            sincronizarán al reconectar.
+          </button>
+        )}
+
+        <main
+          ref={mainRef}
+          className="uptgo-main"
+          style={{
+            padding: isMobile ? '12px' : '28px',
+            minWidth: 0,
+            maxWidth: '100%',
+            overflowX: 'clip',
+            overflowY: 'auto',
+          }}
+        >
+          <div className={isMobile ? 'uptgo-mobile-content' : 'uptgo-content'}>
             {screen}
           </div>
         </main>
-      </div>
-      {isMobile && !isError && <BottomNav route={route} go={go} onAdd={() => setSheet('add')} />}
 
-      {/* sheets */}
-      <SearchSheet open={sheet === 'search'} onClose={() => setSheet(null)} go={go} onOpenTask={openTask} />
-      <NotifSheet open={sheet === 'notif'} onClose={() => setSheet(null)} />
-      <QuickAddSheet open={sheet === 'add'} onClose={() => setSheet(null)} toast={toast} />
-      <MenuSheet open={sheet === 'menu'} onClose={() => setSheet(null)} route={route} go={go} user={DATA.user} theme={theme} onTheme={() => setTweak('dark', !t.dark)} onPomodoro={() => setSheet('pomodoro')} />
-      <Pomodoro open={sheet === 'pomodoro'} onClose={() => setSheet(null)} />
-      <Toast msg={toastMsg} />
-    </div>
-  );
-
-  return (
-    <div className="uptgo-root" data-palette={t.palette} data-theme={theme}
-      style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg-tint)', color: 'var(--text)', fontFamily: 'var(--font-ui)' }}>
-      {/* workspace toolbar */}
-      <div style={{ height: 46, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, borderBottom: '1px solid var(--border)', background: 'var(--surface)', position: 'relative' }}>
-        <span style={{ position: 'absolute', left: 18, display: 'flex', alignItems: 'center', gap: 8 }}><Logo variant="mark" size={22} /><span style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 14, color: 'var(--text-2)' }}>Prototipo</span></span>
-        <div style={{ display: 'flex', gap: 4, background: 'var(--surface-2)', borderRadius: 'var(--r-full)', padding: 3 }}>
-          {[
-            ['mobile', 'Móvil', 'user'],
-            ['desktop', 'Escritorio', 'grid'],
-          ].map(([id, label, ic]) => (
-            <button
-              key={id}
-              onClick={() => setTweak('device', id as TweakValues['device'])} style={{
-                display: 'inline-flex', alignItems: 'center', gap: 7, padding: '6px 15px', borderRadius: 'var(--r-full)', border: 'none', cursor: 'pointer',
-                background: t.device === id ? 'var(--surface)' : 'transparent', boxShadow: t.device === id ? 'var(--shadow-sm)' : 'none',
-                color: t.device === id ? 'var(--text)' : 'var(--text-3)', fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: t.device === id ? 600 : 500,
-              }}><Icon name={id === 'mobile' ? 'user' : 'grid'} size={14} />{label}</button>
-          ))}
-        </div>
-      </div>
-
-      {/* stage */}
-      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: isMobile ? '20px' : '0' }}>
-        {isMobile ? (
-          <div style={{ width: 402, maxWidth: '100%', height: 'min(844px, 100%)', background: '#0b0b0c', borderRadius: 46, padding: 11, boxShadow: 'var(--shadow-lg)', flexShrink: 0 }}>
-            <div style={{ width: '100%', height: '100%', borderRadius: 36, overflow: 'hidden', display: 'flex', flexDirection: 'column', background: 'var(--bg)', position: 'relative' }}>
-              {authed && <StatusBar online={online} />}
-              <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>{appInner}</div>
-            </div>
-          </div>
-        ) : (
-          <div style={{ width: '100%', height: '100%', overflow: 'hidden', position: 'relative' }}>{appInner}</div>
+        {isMobile && !isError && (
+          <BottomNav
+            route={route}
+            go={go}
+            onAdd={() => setSheet('add')}
+          />
         )}
-      </div>
 
-      <TweaksPanel title="Tweaks">
-        <TweakSection label="Vista" />
-        <TweakRadio
-          label="Dispositivo"
-          value={t.device}
-          options={['mobile', 'desktop']}
-          onChange={(v) => setTweak('device', v as TweakValues['device'])}
+        <SearchSheet
+          open={sheet === 'search'}
+          onClose={() => setSheet(null)}
+          go={go}
+          onOpenTask={openTask}
         />
-        <TweakToggle label="Modo oscuro" value={t.dark} onChange={(v) => setTweak('dark', v)} />
-        <TweakSection label="Identidad visual" />
-        <TweakColor
-          label="Paleta"
-          value={
-            {
-              verde: 'oklch(0.52 0.125 142)',
-              cobalto: 'oklch(0.52 0.16 258)',
-              arcilla: 'oklch(0.58 0.135 45)',
-            }[t.palette]
-          }
-          options={[
-            'oklch(0.52 0.125 142)',
-            'oklch(0.52 0.16 258)',
-            'oklch(0.58 0.135 45)',
-          ]}
-          onChange={(value) => {
-            const paletteMap: Record<string, TweakValues['palette']> = {
-              'oklch(0.52 0.125 142)': 'verde',
-              'oklch(0.52 0.16 258)': 'cobalto',
-              'oklch(0.58 0.135 45)': 'arcilla',
+
+        <NotifSheet
+          open={sheet === 'notif'}
+          onClose={() => setSheet(null)}
+        />
+
+        <QuickAddSheet
+          open={sheet === 'add'}
+          onClose={() => setSheet(null)}
+          onPickType={(type) => setCreateModalType(type)}
+        />
+
+        <MenuSheet
+          open={sheet === 'menu'}
+          onClose={() => setSheet(null)}
+          route={route}
+          go={go}
+          user={displayUser}
+          theme={theme}
+          onTheme={() => setTweak('dark', !t.dark)}
+          onPomodoro={() => setSheet('pomodoro')}
+        />
+
+        <CreateAcademicItemModal
+          open={!!createModalType}
+          type={createModalType || 'evento'}
+          onClose={() => setCreateModalType(null)}
+          onCreated={(item) => {
+            if (item.type === 'clase') {
+              addCreatedClassToSchedule(item)
+            } else if (item.type === 'nota') {
+              if (createNoteTaskId) {
+                const noteType = item.noteType || 'texto'
+                const newNote = {
+                  id: item.id,
+                  title: item.title,
+                  subject: item.subject || '',
+                  type: noteType === 'imagen' ? 'foto' : noteType,
+                  noteType,
+                  date: new Date().toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }),
+                  tags: typeof item.tags === 'string'
+                    ? item.tags.split(',').map((tg: string) => tg.trim()).filter(Boolean)
+                    : (item.tags || []),
+                  preview: item.noteText || item.attachmentName || '',
+                  noteText: item.noteText || '',
+                  duration: item.duration || '',
+                  audioUrl: item.audioUrl || null,
+                  imageUrl: item.imageUrl || null,
+                  location: item.location || '',
+                }
+                setTaskNotesMap((prev) => ({
+                  ...prev,
+                  [createNoteTaskId]: [newNote, ...(prev[createNoteTaskId] || [])],
+                }))
+                setCreateNoteTaskId(null)
+              } else {
+                addNote(item)
+              }
             }
 
-            const selectedPalette = paletteMap[String(value)] || 'verde'
-            setTweak('palette', selectedPalette)
+            toast(
+              `${TYPE_LABEL_TEXT[item.type as CreateItemType]} creado correctamente`,
+            )
           }}
         />
-        <TweakSection label="Navegación (escritorio)" />
-        <TweakRadio
-          label="Estilo"
-          value={t.navStyle}
-          options={['sidebar', 'rail', 'top']}
-          onChange={(v) => setTweak('navStyle', v as TweakValues['navStyle'])}
+
+        <CreateReminderModal
+          open={reminderModalOpen}
+          parent={reminderParent}
+          onClose={() => {
+            setReminderModalOpen(false)
+            setReminderParent(null)
+          }}
+          onCreated={(reminder) => {
+            setReminders((currentReminders) => [reminder, ...currentReminders])
+            toast(`Recordatorio creado para ${reminder.parentTitle}`)
+          }}
         />
-        <TweakSection label="Pantalla de inicio" />
-        <TweakRadio
-          label="Variante"
-          value={t.homeVariant}
-          options={['resumen', 'enfoque']}
-          onChange={(v) => setTweak('homeVariant', v as TweakValues['homeVariant'])}
+
+        <Pomodoro
+          open={sheet === 'pomodoro'}
+          onClose={() => setSheet(null)}
         />
-        <TweakSection label="Estado de red" />
-        <TweakToggle label="Simular sin conexión" value={!t.online} onChange={(v) => setTweak('online', !v)} />
-      </TweaksPanel>
+
+        {toastMsg && <Toast msg={toastMsg} />}
+
+        {isAuthenticated && needsProfileCompletion && !profilePromptDismissed && (
+          <CompleteProfileModal onDismiss={() => setProfilePromptDismissed(true)} />
+        )}
+      </div>
     </div>
-  );
+  )
+
+  return (
+    <div
+      className="uptgo-root"
+      data-theme={theme}
+      data-palette={t.palette}
+    >
+      {appInner}
+      {needRefresh && !updateDismissed && (
+        <UpdateBanner
+          onUpdate={() => void updateServiceWorker(true)}
+          onDismiss={() => setUpdateDismissed(true)}
+        />
+      )}
+    </div>
+  )
 }

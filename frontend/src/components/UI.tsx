@@ -91,20 +91,30 @@ export function Card({
       onMouseLeave={() => setIsHover(false)}
       style={{
         background: 'var(--surface)',
-        border: '1px solid var(--border)',
+
+        borderWidth: 1,
+        borderStyle: 'solid',
+        borderColor:
+          hover && isHover
+            ? 'var(--border-strong)'
+            : 'var(--border)',
+
         borderRadius: 'var(--r-md)',
         padding: pad,
-        boxShadow: 'var(--shadow-sm)',
+        boxShadow:
+          hover && isHover
+            ? 'var(--shadow-md)'
+            : 'var(--shadow-sm)',
+
+        transform:
+          hover && isHover
+            ? 'translateY(-1px)'
+            : 'translateY(0)',
+
         transition:
           'border-color .18s var(--ease), box-shadow .18s var(--ease), transform .18s var(--ease)',
         cursor: onClick ? 'pointer' : 'default',
-        ...(hover && isHover
-          ? {
-            borderColor: 'var(--border-strong)',
-            boxShadow: 'var(--shadow-md)',
-            transform: 'translateY(-1px)',
-          }
-          : {}),
+
         ...style,
       }}
       {...rest}
@@ -278,7 +288,23 @@ export function IconButton({
   )
 }
 
-export function Avatar({ initials, size = 34, color }: AnyProps) {
+export function Avatar({ initials, size = 34, color, photo }: AnyProps) {
+  if (photo) {
+    return (
+      <div
+        style={{
+          width: size,
+          height: size,
+          borderRadius: 'var(--r-full)',
+          overflow: 'hidden',
+          flexShrink: 0,
+          border: '1.5px solid var(--border)',
+        }}
+      >
+        <img src={photo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+      </div>
+    )
+  }
   return (
     <div
       style={{
@@ -467,66 +493,51 @@ export function EmptyState({ icon, title, body }: AnyProps) {
   )
 }
 
-export function Sheet({ open, onClose, title, children }: AnyProps) {
+export function Sheet({ open, onClose, title, children, disableBackdropClose }: AnyProps) {
   const isMobile = Boolean((window as any).__UPTGO_MOBILE__)
+
+  if (!open) return null
 
   return (
     <div
+      onClick={disableBackdropClose ? undefined : onClose}
       style={{
-        position: 'absolute',
+        position: 'fixed',
         inset: 0,
-        zIndex: 60,
-        pointerEvents: open ? 'auto' : 'none',
+        zIndex: 80,
+        background: 'oklch(0 0 0 / 0.35)',
+        display: 'flex',
+        alignItems: isMobile ? 'flex-end' : 'center',
+        justifyContent: 'center',
+        padding: isMobile ? '0' : 24,
       }}
     >
       <div
-        onClick={onClose}
+        onClick={(event) => event.stopPropagation()}
         style={{
-          position: 'absolute',
-          inset: 0,
-          background: 'oklch(0 0 0 / 0.38)',
-          backdropFilter: 'blur(2px)',
-          opacity: open ? 1 : 0,
-          transition: 'opacity .3s var(--ease)',
-        }}
-      />
-
-      <div
-        style={{
-          position: 'absolute',
+          width: isMobile ? '100%' : 460,
+          maxWidth: isMobile ? '100%' : 'calc(100vw - 48px)',
+          maxHeight: isMobile ? '86dvh' : 'min(720px, calc(100dvh - 48px))',
+          overflowY: 'auto',
           background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: isMobile
+            ? 'var(--r-xl) var(--r-xl) 0 0'
+            : 'var(--r-xl)',
           boxShadow: 'var(--shadow-pop)',
-          ...(isMobile
-            ? {
-              left: 0,
-              right: 0,
-              bottom: 0,
-              maxHeight: '86%',
-              borderRadius: 'var(--r-xl) var(--r-xl) 0 0',
-              transform: open ? 'translateY(0)' : 'translateY(102%)',
-            }
-            : {
-              top: 0,
-              bottom: 0,
-              right: 0,
-              width: 'min(440px, 92%)',
-              borderRadius: 'var(--r-lg) 0 0 var(--r-lg)',
-              transform: open ? 'translateX(0)' : 'translateX(102%)',
-            }),
-          transition: 'transform .38s var(--ease)',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
+          padding: isMobile
+            ? '10px 16px calc(18px + env(safe-area-inset-bottom))'
+            : 18,
         }}
       >
         {isMobile && (
           <div
             style={{
-              width: 40,
+              width: 42,
               height: 4,
-              borderRadius: 2,
+              borderRadius: 'var(--r-full)',
               background: 'var(--border-strong)',
-              margin: '10px auto 2px',
+              margin: '0 auto 12px',
             }}
           />
         )}
@@ -536,25 +547,30 @@ export function Sheet({ open, onClose, title, children }: AnyProps) {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '14px 18px',
-            borderBottom: title ? '1px solid var(--border)' : 'none',
+            gap: 12,
+            marginBottom: 14,
           }}
         >
           <h3
             style={{
-              fontSize: 16,
-              fontWeight: 600,
+              fontFamily: 'var(--font-display)',
+              fontSize: 18,
               color: 'var(--text)',
-              letterSpacing: '-0.01em',
+              margin: 0,
             }}
           >
             {title}
           </h3>
 
-          <IconButton name="x" size={32} iconSize={16} onClick={onClose} />
+          <IconButton
+            name="x"
+            size={34}
+            title="Cerrar"
+            onClick={onClose}
+          />
         </div>
 
-        <div style={{ padding: 18, overflowY: 'auto', flex: 1 }}>{children}</div>
+        {children}
       </div>
     </div>
   )

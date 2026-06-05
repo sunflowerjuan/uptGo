@@ -1,6 +1,15 @@
 # Node modules
 node_modules/
-
+prompt.md
+CLAUDE.md
+CLAUDE-old.md
+backend/AVANCES.md
+UPTGO.md
+INTEGRATION.md
+fases.md
+fases-int.md
+estrategia_googledrive.txt
+horario_uptc.csv
 # Logs
 logs
 *.log
