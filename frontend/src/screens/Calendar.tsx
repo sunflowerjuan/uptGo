@@ -355,7 +355,7 @@ const DAY_MARKS: Record<number, number[]> = {
   27: [1, 4],
 }
 
-export function Calendar({ m, onAdd }: AnyProps) {
+export function Calendar({ m, onAdd, events = [], onCreated }: AnyProps) {
   const [view, setView] = React.useState<'mes' | 'agenda'>('mes')
   const [sel, setSel] = React.useState(8)
   const [popupDay, setPopupDay] = React.useState<number | null>(null)
@@ -368,7 +368,6 @@ export function Calendar({ m, onAdd }: AnyProps) {
 
   const year = currentDate.getFullYear()
   const month = currentDate.getMonth()
-  const isMockMonth = year === 2026 && month === 4
   const first = new Date(year, month, 1)
   const startDow = (first.getDay() + 6) % 7
   const daysInMonth = new Date(year, month + 1, 0).getDate()
@@ -405,39 +404,17 @@ export function Calendar({ m, onAdd }: AnyProps) {
   }
 
   const agendaDay = (day: number) => {
-    const items: any[] = []
+    const dateKey = formatCreateDate(day)
 
-    if (!isMockMonth) {
-      return items
-    }
-
-    if (DAY_MARKS[day]) {
-      if (day === 8) {
-        return DATA.events.map((event: any) => ({
-          time: event.time,
-          title: event.title,
-          sub: event.loc,
-          color: subjectById(event.subject).color,
-          type: 'evento',
-        }))
-      }
-
-      DAY_MARKS[day].forEach((color, index) => {
-        const subj =
-          DATA.subjects.find((subject: any) => subject.color === color) ||
-          DATA.subjects[0]
-
-        items.push({
-          time: ['08:00', '10:00', '14:00'][index % 3],
-          title: subj.name,
-          sub: subj.room,
-          color,
-          type: 'clase',
-        })
-      })
-    }
-
-    return items
+    return events
+      .filter((event: any) => event.date === dateKey)
+      .map((event: any) => ({
+        time: event.time || 'Todo el día',
+        title: event.title,
+        sub: event.loc || event.location || event.description || '',
+        color: event.color || subjectById(event.subject).color,
+        type: event.type || 'evento',
+      }))
   }
 
   const monthPreview = (day: number) => {
@@ -462,9 +439,6 @@ export function Calendar({ m, onAdd }: AnyProps) {
   }
 
   const monthAgenda = () => {
-    if (!isMockMonth) {
-      return []
-    }
     return Array.from({ length: daysInMonth }, (_, index) => {
       const day = index + 1
       const items = agendaDay(day)
@@ -1224,9 +1198,7 @@ export function Calendar({ m, onAdd }: AnyProps) {
         type={createType || 'evento'}
         initialDate={selectedCreateDate}
         onClose={closeCreateForm}
-        onCreated={(item) => {
-          console.log('Elemento creado desde calendario:', item)
-        }}
+        onCreated={onCreated}
       />
     </div>
   )
@@ -1244,10 +1216,7 @@ export function Schedule({ m, onAdd, toast, scheduleItems = [], onImportSchedule
   const shownDays = m ? [dayIdx] : [0, 1, 2, 3, 4, 5, 6]
   const gridWidth = m ? '100%' : 1120
 
-  const fullSchedule = [
-    ...scheduleItems,
-    ...DATA.schedule,
-  ]
+  const fullSchedule = [...scheduleItems]
 
   const createdSubjects = scheduleItems
     .filter((block: any) => block.subjectData)
@@ -1310,7 +1279,7 @@ export function Schedule({ m, onAdd, toast, scheduleItems = [], onImportSchedule
                     color: 'var(--text-2)',
                   }}
                 >
-                  Semana típica · {uniqueCreatedSubjects.length + DATA.subjects.length} materias
+                  Semana típica · {fullSchedule.length} bloque{fullSchedule.length !== 1 ? 's' : ''}
                 </p>
               </div>
               <Button size="sm" variant="soft" icon="upload" onClick={() => setShowCsvImport(true)}>
@@ -1323,7 +1292,7 @@ export function Schedule({ m, onAdd, toast, scheduleItems = [], onImportSchedule
         {!m && (
           <SectionTitle
             title="Horario"
-            subtitle={`Semana típica · ${uniqueCreatedSubjects.length + DATA.subjects.length} materias`}
+            subtitle={`Semana típica · ${fullSchedule.length} bloque${fullSchedule.length !== 1 ? 's' : ''}`}
             action={
               <div style={{ display: 'flex', gap: 8 }}>
                 <Button size="sm" variant="soft" icon="upload" onClick={() => setShowCsvImport(true)}>

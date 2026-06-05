@@ -261,7 +261,7 @@ function MiniMapCard({ onClick }: AnyProps) {
     </Card>
   )
 }
-export function Dashboard({ m, go, tasks, onToggle, onOpenTask, variant = 'resumen' }: AnyProps) {
+export function Dashboard({ m, go, tasks, events = [], onToggle, onOpenTask, variant = 'resumen' }: AnyProps) {
   const upcoming = tasks.filter((t: any) => !t.done).slice(0, 4)
   const pend = tasks.filter((t: any) => !t.done).length
   const altas = tasks.filter((t: any) => !t.done && t.priority === 'alta').length
@@ -341,7 +341,7 @@ export function Dashboard({ m, go, tasks, onToggle, onOpenTask, variant = 'resum
           }}
         >
           <MetricCard icon="tasks" color={1} label="Pendientes" value={pend} sub={`${altas} de alta prioridad`} onClick={() => go('tasks')} />
-          <MetricCard icon="clock" color={2} label="Clases hoy" value="4" sub="Próxima en 1 h 20 m" onClick={() => go('schedule')} />
+          <MetricCard icon="clock" color={2} label="Eventos hoy" value={events.length} sub="Guardados localmente" onClick={() => go('calendar')} />
           {!m && <MiniMapCard onClick={() => go('map')} />}
           <MetricCard icon="flame" color={4} label="Racha" value={`${DATA.user.streak} d`} sub="¡Sigue así!" />
         </div>
@@ -358,7 +358,7 @@ export function Dashboard({ m, go, tasks, onToggle, onOpenTask, variant = 'resum
         <FadeIn delay={240}>
           <Card pad={m ? 16 : 18}>
             <SectionTitle action="Calendario" onAction={() => go('calendar')}>Eventos de hoy</SectionTitle>
-            <div>{DATA.events.map((e: any, i: number) => <EventRow key={e.id} e={e} last={i === DATA.events.length - 1} />)}</div>
+            <div>{events.map((e: any, i: number) => <EventRow key={e.id} e={e} last={i === events.length - 1} />)}</div>
           </Card>
         </FadeIn>
       </div>
@@ -370,7 +370,7 @@ export function Dashboard({ m, go, tasks, onToggle, onOpenTask, variant = 'resum
           </SectionTitle>
 
           <div>
-            {DATA.events.slice(0, 4).map((e: any, i: number) => (
+            {events.slice(0, 4).map((e: any, i: number) => (
               <EventRow key={e.id} e={e} last={i === 3} />
             ))}
           </div>
