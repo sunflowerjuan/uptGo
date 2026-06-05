@@ -559,6 +559,13 @@ export default function App() {
 
   const [reminderModalOpen, setReminderModalOpen] = useState(false)
   const [reminderParent, setReminderParent] = useState<ReminderParent | null>(null)
+  const [createdScheduleBlocks, setCreatedScheduleBlocks] = useState<any[]>([])
+  const [notes, setNotes] = useState<any[]>(DATA.notes as any[])
+  const [taskNotesMap, setTaskNotesMap] = useState<Record<string, any[]>>({})
+  const [createNoteTaskId, setCreateNoteTaskId] = useState<string | null>(null)
+  const mainRef = useRef<HTMLElement | null>(null)
+  const [headerCollapsed, setHeaderCollapsed] = useState(false)
+  const lastScrollY = useRef(0)
 
   const { isAuthenticated, user: authUser, logout: authLogout, handleOAuthCallback, needsProfileCompletion } = useAuth()
   const {
@@ -666,27 +673,84 @@ export default function App() {
 
     const subjectId =
       item.subjectMode === 'new'
-        ? (subjectData as Record<string, unknown> | null)?.id as string ?? ''
-        : item.subject as string
+        ? subjectData?.id
+        : item.subject
 
-    const days = (item.days as string[]) || []
-    const blockPromises = days
-      .filter((day) => DAY_INDEX[day] !== undefined)
-      .map((day) =>
-        addScheduleBlock({
-          day: DAY_INDEX[day],
-          start: hourToNumber(item.startTime as string),
-          end: hourToNumber(item.endTime as string),
-          subject: subjectId,
-          title: item.title as string,
-          room: (item.room as string) || (item.location as string) || 'Sin aula',
-          location: (item.location as string) || '',
-          locationUrl: (item.locationUrl as string) || '',
-          teacher: (subjectData as Record<string, unknown> | null)?.teacher as string ?? '',
-        }),
-      )
+    const blocks = (item.days || [])
+      .map((day: string) => ({
+        id: `${item.id}-${day}`,
+        day: DAY_INDEX[day],
+        start: hourToNumber(item.startTime),
+        end: hourToNumber(item.endTime),
+        subject: subjectId,
+        title: item.title,
+        room: item.room || item.location || 'Sin aula',
+        location: item.location || '',
+        locationUrl: item.locationUrl || '',
+        teacher: subjectData?.teacher || '',
+        created: true,
+        subjectData,
+      }))
+      .filter((block: any) => block.day !== undefined)
 
-    void Promise.all(blockPromises).then(() => setRoute('schedule'))
+    setCreatedScheduleBlocks((current) => [...blocks, ...current])
+    setRoute('schedule')
+  }
+  const addNote = (item: any) => {
+    const noteType = item.noteType || 'texto'
+    const normalizedType = noteType === 'imagen' ? 'foto' : noteType
+    const newNote = {
+      id: item.id,
+      title: item.title,
+      subject: item.subject || '',
+      type: normalizedType,
+      noteType,
+      date: new Date().toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }),
+      tags: typeof item.tags === 'string'
+        ? item.tags.split(',').map((t: string) => t.trim()).filter(Boolean)
+        : (item.tags || []),
+      preview: item.noteText || item.attachmentName || '',
+      noteText: item.noteText || '',
+      duration: item.duration || '',
+      audioUrl: item.audioUrl || null,
+      imageUrl: item.imageUrl || null,
+      location: item.location || '',
+    }
+    setNotes((prev) => [newNote, ...prev])
+  }
+
+  useEffect(() => {
+    const el = mainRef.current
+    if (!el) return
+    const handler = () => {
+      const currentY = el.scrollTop
+      if (currentY > lastScrollY.current + 8) {
+        setHeaderCollapsed(true)
+      } else if (currentY < lastScrollY.current - 8) {
+        setHeaderCollapsed(false)
+      }
+      lastScrollY.current = currentY
+    }
+    el.addEventListener('scroll', handler, { passive: true })
+    return () => el.removeEventListener('scroll', handler)
+  }, [])
+
+  const updateTask = (id: string | number, changes: Record<string, unknown>) => {
+    setTasks((prev: any[]) => prev.map((t: any) => (t.id === id ? { ...t, ...changes } : t)))
+  }
+
+  const toggleTask = (id: string | number) => {
+    setTasks((currentTasks) =>
+      currentTasks.map((task) =>
+        task.id === id
+          ? {
+            ...task,
+            done: !task.done,
+            status: !task.done ? 'entregada' : 'pendiente',
+          }
+          : task,
+      ),
+    )
   }
 
   if (dataLoading) {
@@ -733,13 +797,12 @@ export default function App() {
         onToggle={(id: string) => void toggleTask(id)}
         toast={toast}
         onCreateReminder={openReminderModal}
-        taskNotes={notes.filter((note) => note.taskId === openTaskId)}
+        taskNotes={taskNotesMap[String(openTaskId)] || []}
         onAddNote={() => {
-          setNoteParentTaskId(String(openTaskId))
+          setCreateNoteTaskId(String(openTaskId))
           setCreateModalType('nota')
         }}
-        onDeleteNote={(id: string) => void deleteNote(id).then(() => toast('Nota eliminada'))}
-        onUpdateTask={(id: string, changes: Record<string, unknown>) => void updateTask(id, changes)}
+        onUpdateTask={updateTask}
       />
     )
   } else {
@@ -774,6 +837,7 @@ export default function App() {
             scheduleItems={scheduleBlocks}
             onAdd={() => setCreateModalType('clase')}
             toast={toast}
+            onImportSchedule={(blocks: any[]) => setCreatedScheduleBlocks((prev) => [...blocks, ...prev])}
           />
         )
         break
@@ -789,6 +853,8 @@ export default function App() {
             }}
             onDeleteNote={(id: string) => void deleteNote(id).then(() => toast('Nota eliminada'))}
             toast={toast}
+            notes={notes}
+            onDeleteNote={(id: string) => setNotes((prev: any[]) => prev.filter((n: any) => n.id !== id))}
           />
         )
         break
@@ -873,6 +939,7 @@ export default function App() {
             onTheme={() => setTweak('dark', !t.dark)}
             theme={theme}
             unread={unread}
+            collapsed={headerCollapsed}
           />
         )}
 
@@ -898,12 +965,14 @@ export default function App() {
         )}
 
         <main
+          ref={mainRef}
           className="uptgo-main"
           style={{
             padding: isMobile ? '12px' : '28px',
             minWidth: 0,
             maxWidth: '100%',
             overflowX: 'clip',
+            overflowY: 'auto',
           }}
         >
           <div className={isMobile ? 'uptgo-mobile-content' : 'uptgo-content'}>
@@ -1007,6 +1076,34 @@ export default function App() {
               })
             } else if (itemType === 'clase') {
               addCreatedClassToSchedule(item)
+            } else if (item.type === 'nota') {
+              if (createNoteTaskId) {
+                const noteType = item.noteType || 'texto'
+                const newNote = {
+                  id: item.id,
+                  title: item.title,
+                  subject: item.subject || '',
+                  type: noteType === 'imagen' ? 'foto' : noteType,
+                  noteType,
+                  date: new Date().toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }),
+                  tags: typeof item.tags === 'string'
+                    ? item.tags.split(',').map((tg: string) => tg.trim()).filter(Boolean)
+                    : (item.tags || []),
+                  preview: item.noteText || item.attachmentName || '',
+                  noteText: item.noteText || '',
+                  duration: item.duration || '',
+                  audioUrl: item.audioUrl || null,
+                  imageUrl: item.imageUrl || null,
+                  location: item.location || '',
+                }
+                setTaskNotesMap((prev) => ({
+                  ...prev,
+                  [createNoteTaskId]: [newNote, ...(prev[createNoteTaskId] || [])],
+                }))
+                setCreateNoteTaskId(null)
+              } else {
+                addNote(item)
+              }
             }
 
             toast(

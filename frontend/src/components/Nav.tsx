@@ -2,6 +2,7 @@ import React from 'react'
 import { Icon } from './Icons'
 import { Logo } from './Logo'
 import { Avatar, IconButton, Sheet } from './UI'
+import { DATA } from '../data/data'
 
 type NavItem = {
   id: string
@@ -51,6 +52,7 @@ type TopBarProps = {
   onTheme: () => void
   theme: string
   unread: number
+  collapsed?: boolean
 }
 
 type SyncChipProps = {
@@ -417,6 +419,101 @@ export function TopTabs({ route, go }: TopTabsProps) {
 
 /* ---------------- TOPBAR ---------------- */
 
+type SearchResult = {
+  id: string | number
+  title: string
+  kind: 'task' | 'note'
+}
+
+function SearchDropdown({
+  results,
+  onSelect,
+  style,
+}: {
+  results: SearchResult[]
+  onSelect: (r: SearchResult) => void
+  style?: React.CSSProperties
+}) {
+  const tasks = results.filter((r) => r.kind === 'task')
+  const notes = results.filter((r) => r.kind === 'note')
+
+  const sectionLabel: React.CSSProperties = {
+    fontSize: 10.5,
+    fontWeight: 700,
+    letterSpacing: '0.07em',
+    textTransform: 'uppercase',
+    color: 'var(--text-3)',
+    padding: '8px 14px 4px',
+  }
+
+  const rowStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    width: '100%',
+    padding: '10px 14px',
+    background: 'none',
+    border: 'none',
+    borderBottom: '1px solid var(--border)',
+    cursor: 'pointer',
+    textAlign: 'left',
+    fontFamily: 'var(--font-ui)',
+  }
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        top: '100%',
+        left: 0,
+        right: 0,
+        marginTop: 6,
+        background: 'var(--surface)',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--r-md)',
+        boxShadow: 'var(--shadow-lg)',
+        zIndex: 80,
+        maxHeight: 420,
+        overflowY: 'auto',
+        ...style,
+      }}
+    >
+      {tasks.length > 0 && (
+        <>
+          <div style={sectionLabel}>Tareas</div>
+          {tasks.map((r) => (
+            <button
+              key={`task-${r.id}`}
+              onMouseDown={(e) => { e.preventDefault(); onSelect(r) }}
+              style={rowStyle}
+            >
+              <Icon name="tasks" size={15} color="var(--text-3)" />
+              <span style={{ fontSize: 13, color: 'var(--text)', flex: 1 }}>{r.title}</span>
+            </button>
+          ))}
+        </>
+      )}
+      {notes.length > 0 && (
+        <>
+          <div style={{ ...sectionLabel, borderTop: tasks.length > 0 ? '1px solid var(--border)' : undefined }}>
+            Notas
+          </div>
+          {notes.map((r) => (
+            <button
+              key={`note-${r.id}`}
+              onMouseDown={(e) => { e.preventDefault(); onSelect(r) }}
+              style={{ ...rowStyle, borderBottom: 'none' }}
+            >
+              <Icon name="notes" size={15} color="var(--text-3)" />
+              <span style={{ fontSize: 13, color: 'var(--text)', flex: 1 }}>{r.title}</span>
+            </button>
+          ))}
+        </>
+      )}
+    </div>
+  )
+}
+
 export function TopBar({
   isMobile,
   navStyle,
@@ -430,26 +527,75 @@ export function TopBar({
   onTheme,
   theme,
   unread,
+  collapsed = false,
 }: TopBarProps) {
   const title = navItem(route)?.label || 'UPTGO'
+  const [searchQ, setSearchQ] = React.useState('')
+  const [searchFocused, setSearchFocused] = React.useState(false)
+  const searchRef = React.useRef<HTMLDivElement | null>(null)
+
+  // Build inline search results from DATA (no limit — shown in scrollable dropdown)
+  const searchResults: SearchResult[] = React.useMemo(() => {
+    if (!searchQ.trim() || searchQ.length < 2) return []
+    const q = searchQ.toLowerCase()
+    const tasks = (DATA.tasks as { id: string | number; title: string }[])
+      .filter((t) => t.title.toLowerCase().includes(q))
+      .map((t): SearchResult => ({ id: t.id, title: t.title, kind: 'task' }))
+    const notes = (DATA.notes as { id: string | number; title: string }[])
+      .filter((n) => n.title.toLowerCase().includes(q))
+      .map((n): SearchResult => ({ id: n.id, title: n.title, kind: 'note' }))
+    return [...tasks, ...notes]
+  }, [searchQ])
+
+  const showDropdown = searchFocused && searchQ.length >= 2
+
+  // Handle click outside dropdown
+  React.useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setSearchFocused(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  // Keyboard: close on Escape
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') { setSearchFocused(false); setSearchQ('') }
+  }
+
+  const handleSelectResult = (r: SearchResult) => {
+    setSearchQ('')
+    setSearchFocused(false)
+    go(r.kind === 'task' ? 'tasks' : 'notes')
+  }
+
+  const headerHeight = isMobile ? 56 : 60
 
   return (
     <header
       style={{
         background: 'color-mix(in oklch, var(--surface) 86%, transparent)',
         backdropFilter: 'blur(12px)',
-        borderBottom: '1px solid var(--border)',
-        display: 'flex',
+        boxShadow: '0 1px 0 var(--border)',
+        display: 'grid',
+        gridTemplateColumns: isMobile || navStyle === 'top'
+          ? '1fr auto'
+          : '1fr minmax(0, 340px) 1fr',
         alignItems: 'center',
-        justifyContent: 'space-between',
         gap: 14,
         padding: isMobile ? '0 14px' : '0 22px',
-        height: isMobile ? 56 : 60,
+        height: collapsed ? 0 : headerHeight,
+        overflow: collapsed ? 'hidden' : 'visible',
+        transition: 'height .25s var(--ease)',
         flexShrink: 0,
         zIndex: 20,
-        position: 'relative',
+        position: 'sticky',
+        top: 0,
       }}
     >
+      {/* Left section */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
         {isMobile ? (
           <button
@@ -508,25 +654,28 @@ export function TopBar({
         )}
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 12 }}>
-        {!isMobile && (
+      {/* Center search — desktop only, non-top nav */}
+      {!isMobile && navStyle !== 'top' && (
+        <div ref={searchRef} style={{ position: 'relative' }}>
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: 8,
               background: 'var(--surface-2)',
-              border: '1px solid var(--border)',
+              border: '1px solid ' + (searchFocused ? 'var(--border-strong)' : 'var(--border)'),
               borderRadius: 'var(--r-full)',
               padding: '8px 14px',
-              width: 260,
+              transition: 'border-color .15s',
             }}
           >
             <Icon name="search" size={15} color="var(--text-3)" />
             <input
               placeholder="Buscar tareas, notas, materias…"
-              onFocus={onSearch}
-              readOnly
+              value={searchQ}
+              onChange={(e) => setSearchQ(e.target.value)}
+              onFocus={() => setSearchFocused(true)}
+              onKeyDown={handleKeyDown}
               style={{
                 border: 'none',
                 background: 'transparent',
@@ -535,12 +684,51 @@ export function TopBar({
                 fontSize: 13,
                 color: 'var(--text)',
                 width: '100%',
-                cursor: 'pointer',
               }}
             />
+            {searchQ && (
+              <button
+                onClick={() => { setSearchQ(''); setSearchFocused(false) }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 0, display: 'flex' }}
+              >
+                <Icon name="x" size={13} />
+              </button>
+            )}
           </div>
-        )}
 
+          {showDropdown && searchResults.length > 0 && (
+            <SearchDropdown
+              results={searchResults}
+              onSelect={handleSelectResult}
+            />
+          )}
+          {showDropdown && searchResults.length === 0 && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                marginTop: 6,
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--r-md)',
+                boxShadow: 'var(--shadow-lg)',
+                zIndex: 80,
+                padding: '14px',
+                fontSize: 13,
+                color: 'var(--text-3)',
+                textAlign: 'center',
+              }}
+            >
+              Sin resultados para "{searchQ}"
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Right section */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 12, justifyContent: 'flex-end' }}>
         <SyncChip online={online} compact={isMobile} />
 
         {isMobile && <IconButton name="search" onClick={onSearch} title="Buscar" />}
