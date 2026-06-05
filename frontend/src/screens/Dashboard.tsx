@@ -2,7 +2,9 @@ import { DATA } from '../data/data'
 import { useEffect, useState } from 'react'
 import { Icon } from '../components/Icons'
 import { Button, Card, FadeIn, Pill, PRIORITY, SectionTitle, cSoftVar, cVar, subjectById, } from '../components/UI'
+import type { DbTask, DbEvent } from '../services/db'
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyProps = Record<string, any>
 
 function MetricCard({ icon, color, label, value, sub, onClick }: AnyProps) {
@@ -261,10 +263,12 @@ function MiniMapCard({ onClick }: AnyProps) {
     </Card>
   )
 }
-export function Dashboard({ m, go, tasks, onToggle, onOpenTask, variant = 'resumen' }: AnyProps) {
-  const upcoming = tasks.filter((t: any) => !t.done).slice(0, 4)
-  const pend = tasks.filter((t: any) => !t.done).length
-  const altas = tasks.filter((t: any) => !t.done && t.priority === 'alta').length
+export function Dashboard({ m, go, tasks: tasksProp, events: eventsProp, onToggle, onOpenTask, variant = 'resumen' }: AnyProps) {
+  const tasks: DbTask[] = (tasksProp as DbTask[] | undefined) ?? []
+  const events: DbEvent[] = (eventsProp as DbEvent[] | undefined) ?? []
+  const upcoming = tasks.filter((t: DbTask) => !t.done).slice(0, 4)
+  const pend = tasks.filter((t: DbTask) => !t.done).length
+  const altas = tasks.filter((t: DbTask) => !t.done && t.priority === 'alta').length
   const hour = new Date().getHours()
   const greet = hour < 12 ? 'Buenos días' : hour < 19 ? 'Buenas tardes' : 'Buenas noches'
   const enfoque = variant === 'enfoque'
@@ -351,14 +355,17 @@ export function Dashboard({ m, go, tasks, onToggle, onOpenTask, variant = 'resum
         <FadeIn delay={180}>
           <Card pad={m ? 16 : 18}>
             <SectionTitle action="Ver todas" onAction={() => go('tasks')}>Tareas próximas</SectionTitle>
-            <div>{upcoming.map((t: any) => <DashTaskRow key={t.id} t={t} onToggle={onToggle} onOpen={onOpenTask} />)}</div>
+            <div>{upcoming.map((t: DbTask) => <DashTaskRow key={t.id} t={t} onToggle={onToggle} onOpen={onOpenTask} />)}</div>
           </Card>
         </FadeIn>
 
         <FadeIn delay={240}>
           <Card pad={m ? 16 : 18}>
             <SectionTitle action="Calendario" onAction={() => go('calendar')}>Eventos de hoy</SectionTitle>
-            <div>{DATA.events.map((e: any, i: number) => <EventRow key={e.id} e={e} last={i === DATA.events.length - 1} />)}</div>
+            <div>{events.length > 0
+              ? events.map((e: DbEvent, i: number) => <EventRow key={e.id} e={e} last={i === events.length - 1} />)
+              : <div style={{ fontSize: 13, color: 'var(--text-3)', padding: '12px 0' }}>Sin eventos para hoy</div>
+            }</div>
           </Card>
         </FadeIn>
       </div>
@@ -370,9 +377,12 @@ export function Dashboard({ m, go, tasks, onToggle, onOpenTask, variant = 'resum
           </SectionTitle>
 
           <div>
-            {DATA.events.slice(0, 4).map((e: any, i: number) => (
-              <EventRow key={e.id} e={e} last={i === 3} />
-            ))}
+            {events.length > 0
+              ? events.slice(0, 4).map((e: DbEvent, i: number) => (
+                  <EventRow key={e.id} e={e} last={i === 3} />
+                ))
+              : <div style={{ fontSize: 13, color: 'var(--text-3)', padding: '12px 0' }}>Sin clases registradas</div>
+            }
           </div>
         </Card>
       </FadeIn>

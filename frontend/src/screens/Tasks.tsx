@@ -410,45 +410,14 @@ export function Tasks({ m, tasks, onToggle, onOpenTask, onAdd }: AnyProps) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <FadeIn>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 12,
-          }}
-        >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <div>
-            {m && (
-              <h1
-                style={{
-                  fontSize: 22,
-                  fontWeight: 600,
-                  color: 'var(--text)',
-                  fontFamily: 'var(--font-display)',
-                  letterSpacing: '-0.02em',
-                }}
-              >
-                Tareas
-              </h1>
-            )}
-
-            <p
-              style={{
-                fontSize: 13,
-                color: 'var(--text-3)',
-                marginTop: m ? 3 : 0,
-              }}
-            >
+            {m && <h1 style={{ fontSize: 22, fontWeight: 600, color: 'var(--text)', fontFamily: 'var(--font-display)', letterSpacing: '-0.02em' }}>Tareas</h1>}
+            <p style={{ fontSize: 13, color: 'var(--text-3)', marginTop: m ? 3 : 0 }}>
               {pending.length} pendientes · {done.length} completadas
             </p>
           </div>
-
-          {!m && (
-            <Button icon="plus" onClick={onAdd}>
-              Nueva tarea
-            </Button>
-          )}
+          {!m && <Button icon="plus" onClick={onAdd}>Nueva tarea</Button>}
         </div>
       </FadeIn>
 
@@ -543,21 +512,17 @@ export function Tasks({ m, tasks, onToggle, onOpenTask, onAdd }: AnyProps) {
             <TaskCard t={t} onToggle={onToggle} onOpen={onOpenTask} />
           </FadeIn>
         ))}
+        {done.length > 0 && <div style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-3)', marginTop: 10 }}>Completadas</div>}
+        {done.map((t: AnyProps, i: number) => (
+          <FadeIn key={t.id} delay={120 + i * 40}><TaskCard t={t} onToggle={onToggle} onOpen={onOpenTask} /></FadeIn>
+        ))}
+        {list.length === 0 && <EmptyState icon="tasks" title="Sin tareas" body="No hay tareas con estos filtros." />}
+      </div>
 
-        {done.length > 0 && (
-          <div
-            style={{
-              fontSize: 11.5,
-              fontWeight: 600,
-              letterSpacing: '0.06em',
-              textTransform: 'uppercase',
-              color: 'var(--text-3)',
-              marginTop: 10,
-            }}
-          >
-            Completadas
-          </div>
-        )}
+      <AdvancedFiltersSheet open={filtersOpen} onClose={() => setFiltersOpen(false)} filters={advFilters} onApply={setAdvFilters} />
+    </div>
+  )
+}
 
         {done.map((t: AnyProps, i: number) => (
           <FadeIn key={t.id} delay={120 + i * 40}>
@@ -565,9 +530,49 @@ export function Tasks({ m, tasks, onToggle, onOpenTask, onAdd }: AnyProps) {
           </FadeIn>
         ))}
 
-        {list.length === 0 && (
-          <EmptyState icon="tasks" title="Sin tareas" body="No hay tareas con estos filtros." />
-        )}
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function FilePreviewModal({ attachment, m, onClose }: { attachment: AttachmentEntry; m: boolean; onClose: () => void }) {
+  const icon = getFileIcon(attachment.name)
+  const isImage = icon === 'image'
+  const isAudio = icon === 'mic'
+  const ext = attachment.name.split('.').pop()?.toLowerCase() || ''
+  const isPdf = ext === 'pdf'
+  const extLabel = attachment.name.split('.').pop()?.toUpperCase() || 'ARCHIVO'
+
+  const handleDownload = () => { const a = document.createElement('a'); a.href = attachment.url; a.download = attachment.name; document.body.appendChild(a); a.click(); document.body.removeChild(a) }
+  const handleOpenNew = () => window.open(attachment.url, '_blank', 'noopener,noreferrer')
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 130, background: 'oklch(0 0 0 / 0.45)', display: 'flex', alignItems: m ? 'flex-end' : 'center', justifyContent: 'center', padding: m ? 0 : 20 }} onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: m ? '100%' : 680, maxWidth: '100%', maxHeight: m ? '92dvh' : 'calc(100dvh - 40px)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: m ? '22px 22px 0 0' : 22, boxShadow: 'var(--shadow-pop)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'flex-start', gap: 12, flexShrink: 0 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{attachment.name}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>{extLabel} · {attachment.size}</div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+            {(isImage || isPdf || isAudio) && <Button variant="soft" size="sm" onClick={handleOpenNew}>Abrir</Button>}
+            <Button variant="soft" size="sm" onClick={handleDownload}>Descargar</Button>
+            <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: 'var(--r-full)', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="x" size={14} /></button>
+          </div>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
+          {isImage && <img src={attachment.url} alt={attachment.name} style={{ width: '100%', display: 'block', objectFit: 'contain', maxHeight: 520 }} />}
+          {isAudio && <div style={{ padding: 24 }}><audio src={attachment.url} controls style={{ width: '100%', borderRadius: 'var(--r-sm)' }} /></div>}
+          {isPdf && <iframe src={attachment.url} title={attachment.name} style={{ width: '100%', height: 480, border: 0, display: 'block' }} />}
+          {!isImage && !isAudio && !isPdf && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, padding: 40, color: 'var(--text-3)' }}>
+              <Icon name="paperclip" size={40} color="var(--text-3)" />
+              <p style={{ fontSize: 14, color: 'var(--text-2)', textAlign: 'center', margin: 0 }}>No hay vista previa para archivos {extLabel}.</p>
+              <Button onClick={handleDownload}>Descargar archivo</Button>
+            </div>
+          )}
+        </div>
       </div>
 
       <AdvancedFiltersSheet
@@ -1033,15 +1038,21 @@ export function TaskDetail({
     return 'Texto'
   }
 
-  const openReminder = () => {
-    onCreateReminder?.({
-      id: task.id,
-      type: 'tarea',
-      title: task.title,
-      date: task.dueDate || '',
-      time: task.dueTime || '',
-      subtitle: s.name,
-    })
+  const noteTypeLabel = (n: AnyProps): string => {
+    const t: string = n.type || n.noteType || 'texto'
+    if (t === 'audio') return `Audio${n.duration ? ' · ' + n.duration : ''}`
+    if (t === 'foto' || t === 'imagen') return 'Foto'
+    if (t === 'ubicacion') return 'Ubicación'
+    return 'Texto'
+  }
+
+  const openReminder = () => { onCreateReminder?.({ id: task.id, type: 'tarea', title: task.title, date: task.dueDate || '', time: task.dueTime || '', subtitle: s.name }) }
+
+  const handleFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    const newEntries: AttachmentEntry[] = files.map((file) => ({ name: file.name, type: file.name.split('.').pop()?.toUpperCase() || 'archivo', size: formatFileSize(file.size), url: URL.createObjectURL(file) }))
+    setAttachments((prev) => [...prev, ...newEntries])
+    e.target.value = ''
   }
 
   const handleFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1061,146 +1072,25 @@ export function TaskDetail({
     setAttachments((prev) => prev.filter((x) => x.url !== a.url))
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 16,
-        maxWidth: 760,
-        margin: '0 auto',
-        width: '100%',
-      }}
-    >
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 760, margin: '0 auto', width: '100%' }}>
       <FadeIn>
-        <button
-          onClick={onBack}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            background: 'none',
-            border: 'none',
-            color: 'var(--text-2)',
-            cursor: 'pointer',
-            fontFamily: 'var(--font-ui)',
-            fontSize: 13,
-            fontWeight: 500,
-            padding: 0,
-          }}
-        >
-          <Icon name="arrowLeft" size={16} />
-          Volver a tareas
+        <button onClick={onBack} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: 'var(--text-2)', cursor: 'pointer', fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: 500, padding: 0 }}>
+          <Icon name="arrowLeft" size={16} />Volver a tareas
         </button>
       </FadeIn>
 
       <FadeIn delay={50}>
         <Card pad={m ? 18 : 24}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
-            <Pill color={cVar(s.color)} bg={cSoftVar(s.color)} dot>
-              {s.name}
-            </Pill>
-
-            <Pill color={pr.color} bg={pr.soft}>
-              Prioridad {pr.label}
-            </Pill>
-
-            <Pill color={st.color} bg={st.soft}>
-              {st.label}
-            </Pill>
+            <Pill color={cVar(s.color)} bg={cSoftVar(s.color)} dot>{s.name}</Pill>
+            <Pill color={pr.color} bg={pr.soft}>Prioridad {pr.label}</Pill>
+            <Pill color={st.color} bg={st.soft}>{st.label}</Pill>
           </div>
-
-          <h1
-            style={{
-              fontSize: m ? 21 : 25,
-              fontWeight: 600,
-              color: 'var(--text)',
-              letterSpacing: '-0.02em',
-              lineHeight: 1.2,
-              fontFamily: 'var(--font-display)',
-            }}
-          >
-            {task.title}
-          </h1>
-
-          <div
-            style={{
-              display: 'flex',
-              gap: 20,
-              flexWrap: 'wrap',
-              marginTop: 16,
-            }}
-          >
-            <div>
-              <div
-                style={{
-                  fontSize: 11,
-                  color: 'var(--text-3)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                }}
-              >
-                Entrega
-              </div>
-
-              <div
-                style={{
-                  fontSize: 14,
-                  color: 'var(--text)',
-                  fontWeight: 500,
-                  marginTop: 3,
-                }}
-              >
-                {task.due}
-              </div>
-            </div>
-
-            <div>
-              <div
-                style={{
-                  fontSize: 11,
-                  color: 'var(--text-3)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                }}
-              >
-                Docente
-              </div>
-
-              <div
-                style={{
-                  fontSize: 14,
-                  color: 'var(--text)',
-                  fontWeight: 500,
-                  marginTop: 3,
-                }}
-              >
-                {s.teacher}
-              </div>
-            </div>
-
-            <div>
-              <div
-                style={{
-                  fontSize: 11,
-                  color: 'var(--text-3)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                }}
-              >
-                Aula
-              </div>
-
-              <div
-                style={{
-                  fontSize: 14,
-                  color: 'var(--text)',
-                  fontWeight: 500,
-                  marginTop: 3,
-                }}
-              >
-                {s.room}
-              </div>
-            </div>
+          <h1 style={{ fontSize: m ? 21 : 25, fontWeight: 600, color: 'var(--text)', letterSpacing: '-0.02em', lineHeight: 1.2, fontFamily: 'var(--font-display)' }}>{task.title}</h1>
+          <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginTop: 16 }}>
+            <div><div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Entrega</div><div style={{ fontSize: 14, color: 'var(--text)', fontWeight: 500, marginTop: 3 }}>{task.due}</div></div>
+            <div><div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Docente</div><div style={{ fontSize: 14, color: 'var(--text)', fontWeight: 500, marginTop: 3 }}>{s.teacher}</div></div>
+            <div><div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Aula</div><div style={{ fontSize: 14, color: 'var(--text)', fontWeight: 500, marginTop: 3 }}>{s.room}</div></div>
           </div>
 
           {task.desc && (
@@ -1217,14 +1107,7 @@ export function TaskDetail({
           )}
 
           <div style={{ display: 'flex', gap: 10, marginTop: 20, flexWrap: 'wrap' }}>
-            <Button
-              variant={task.done ? 'outline' : 'primary'}
-              icon={task.done ? 'refresh' : 'check'}
-              onClick={() => {
-                onToggle(task.id)
-                toast(task.done ? 'Tarea reabierta' : '¡Tarea completada!')
-              }}
-            >
+            <Button variant={task.done ? 'outline' : 'primary'} icon={task.done ? 'refresh' : 'check'} onClick={() => { onToggle(task.id); toast(task.done ? 'Tarea reabierta' : '¡Tarea completada!') }}>
               {task.done ? 'Reabrir tarea' : 'Marcar entregada'}
             </Button>
 

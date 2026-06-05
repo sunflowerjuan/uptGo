@@ -8,6 +8,9 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: 'auto',
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
 
       manifest: {
         name: 'UPTGO',
@@ -43,54 +46,9 @@ export default defineConfig({
         ],
       },
 
-      workbox: {
-        // Precaché: todos los assets del build (estáticos + immutables)
+      injectManifest: {
+        // Precache all static assets
         globPatterns: ['**/*.{js,css,html,ico,svg,png,woff2,woff,webp}'],
-        cleanupOutdatedCaches: true,
-        clientsClaim: true,
-
-        runtimeCaching: [
-          // Stale While Revalidate — auth/me y settings (tolera desactualización)
-          {
-            urlPattern: /\/api\/(auth\/me|settings)(\?.*)?$/,
-            handler: 'StaleWhileRevalidate',
-            options: {
-              cacheName: 'api-swr',
-              expiration: {
-                maxEntries: 10,
-                maxAgeSeconds: 60 * 60, // 1 hora
-              },
-              cacheableResponse: { statuses: [0, 200] },
-            },
-          },
-          // Network First — todas las demás llamadas /api/* con fallback a caché
-          {
-            urlPattern: /\/api\/.*/,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'api-dynamic',
-              networkTimeoutSeconds: 3,
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 24 * 60 * 60, // 24 horas
-              },
-              cacheableResponse: { statuses: [0, 200] },
-            },
-          },
-          // Cache First — Google Fonts (inmutables)
-          {
-            urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'google-fonts',
-              expiration: {
-                maxEntries: 20,
-                maxAgeSeconds: 365 * 24 * 60 * 60, // 1 año
-              },
-              cacheableResponse: { statuses: [0, 200] },
-            },
-          },
-        ],
       },
 
       devOptions: {
