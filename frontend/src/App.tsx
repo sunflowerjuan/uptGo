@@ -1,5 +1,6 @@
 import { DATA } from './data/data'
 import { useEffect, useRef, useState } from 'react'
+import { useRegisterSW } from 'virtual:pwa-register/react'
 import { useAuth } from './contexts/AuthContext'
 import { Icon } from './components/Icons'
 import { Sheet, EmptyState, cSoftVar, cVar } from './components/UI'
@@ -150,6 +151,81 @@ function Toast({ msg }: ToastProps) {
     >
       <Icon name="check" size={15} color="var(--bg)" stroke={2.4} />
       {msg}
+    </div>
+  )
+}
+
+type UpdateBannerProps = {
+  onUpdate: () => void
+  onDismiss: () => void
+}
+
+function UpdateBanner({ onUpdate, onDismiss }: UpdateBannerProps) {
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        bottom: 24,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        zIndex: 90,
+        background: 'var(--surface)',
+        border: '1px solid var(--border-strong)',
+        borderRadius: 'var(--r-lg)',
+        boxShadow: 'var(--shadow-pop)',
+        padding: '14px 18px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 14,
+        maxWidth: 'calc(100vw - 32px)',
+        width: 'max-content',
+      }}
+    >
+      <Icon name="download" size={18} color="var(--primary)" />
+      <span
+        style={{
+          fontSize: 13.5,
+          fontWeight: 500,
+          color: 'var(--text)',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        Nueva versión disponible
+      </span>
+      <div style={{ display: 'flex', gap: 8, marginLeft: 4 }}>
+        <button
+          onClick={onUpdate}
+          style={{
+            padding: '6px 14px',
+            borderRadius: 'var(--r-full)',
+            background: 'var(--primary)',
+            color: 'var(--on-primary)',
+            border: 'none',
+            fontFamily: 'var(--font-ui)',
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          Actualizar
+        </button>
+        <button
+          onClick={onDismiss}
+          style={{
+            padding: '6px 10px',
+            borderRadius: 'var(--r-full)',
+            background: 'transparent',
+            color: 'var(--text-3)',
+            border: '1px solid var(--border)',
+            fontFamily: 'var(--font-ui)',
+            fontSize: 13,
+            cursor: 'pointer',
+          }}
+        >
+          Más tarde
+        </button>
+      </div>
     </div>
   )
 }
@@ -466,6 +542,12 @@ export default function App() {
   const isMobile = useIsMobile()
 
   window.__UPTGO_MOBILE__ = isMobile
+
+  const [updateDismissed, setUpdateDismissed] = useState(false)
+  const {
+    needRefresh: [needRefresh],
+    updateServiceWorker,
+  } = useRegisterSW()
 
   const [reminderModalOpen, setReminderModalOpen] = useState(false)
   const [reminderParent, setReminderParent] = useState<ReminderParent | null>(null)
@@ -894,6 +976,12 @@ export default function App() {
       data-palette={t.palette}
     >
       {appInner}
+      {needRefresh && !updateDismissed && (
+        <UpdateBanner
+          onUpdate={() => void updateServiceWorker(true)}
+          onDismiss={() => setUpdateDismissed(true)}
+        />
+      )}
     </div>
   )
 }
