@@ -2,6 +2,7 @@ import { DATA } from './data/data'
 import { useEffect, useRef, useState } from 'react'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 import { useAuth } from './contexts/AuthContext'
+import { useData } from './contexts/DataContext'
 import { Icon } from './components/Icons'
 import { Sheet, EmptyState, cSoftVar, cVar } from './components/UI'
 import { TopBar, Sidebar, BottomNav, MenuSheet } from './components/Nav'
@@ -60,6 +61,8 @@ type SearchSheetProps = {
   onClose: () => void
   go: (route: string) => void
   onOpenTask: (id: number | string) => void
+  tasks: any[]
+  notes: any[]
 }
 
 type NotifSheetProps = {
@@ -96,6 +99,95 @@ const DAY_INDEX: Record<string, number> = {
   Vie: 4,
   Sáb: 5,
   Dom: 6,
+}
+
+const createId = (prefix: string) =>
+  `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+
+function displayDate(value?: string) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })
+}
+
+function normalizeTaskItem(item: any) {
+  const due = item.dueDate
+    ? `${displayDate(item.dueDate)}${item.dueTime ? ` · ${item.dueTime}` : ''}`
+    : item.due || ''
+
+  return {
+    ...item,
+    id: item.id || createId('tarea'),
+    title: item.title || 'Nueva tarea',
+    subject: item.subject || '',
+    due,
+    dueShort: item.dueDate ? displayDate(item.dueDate) : item.dueShort || due,
+    priority: item.priority || 'media',
+    status: item.status || 'pendiente',
+    done: item.done ?? item.status === 'entregada',
+    desc: item.desc || item.description || '',
+    attachments: item.attachmentName ? 1 : item.attachments || 0,
+    notesCount: item.notesCount || 0,
+  }
+}
+
+function normalizeNoteItem(item: any, taskId?: string | null) {
+  const noteType = item.noteType || item.type || 'texto'
+  const normalizedType = noteType === 'imagen' ? 'foto' : noteType
+  const tags =
+    typeof item.tags === 'string'
+      ? item.tags.split(',').map((tag: string) => tag.trim()).filter(Boolean)
+      : item.tags || []
+
+  return {
+    ...item,
+    id: item.id || createId('nota'),
+    title: item.title || 'Nueva nota',
+    subject: item.subject || '',
+    type: normalizedType,
+    noteType,
+    date:
+      item.date ||
+      new Date().toLocaleDateString('es-CO', {
+        day: 'numeric',
+        month: 'short',
+      }),
+    tags,
+    content: item.content || item.noteText || item.preview || '',
+    preview: item.preview || item.noteText || item.attachmentName || '',
+    noteText: item.noteText || item.content || '',
+    duration: item.duration || '',
+    audioUrl: item.audioUrl || null,
+    imageUrl: item.imageUrl || null,
+    location: item.location || '',
+    parentId: taskId || item.parentId || '',
+  }
+}
+
+function normalizeEventItem(item: any) {
+  return {
+    ...item,
+    id: item.id || createId('evento'),
+    title: item.title || 'Nuevo evento',
+    date: item.date || '',
+    time: item.time || '',
+    subject: item.subject || '',
+    color: item.color || 1,
+    loc: item.location || item.loc || '',
+    dur: item.dur || '',
+  }
+}
+
+function normalizeReminderItem(item: any) {
+  return {
+    ...item,
+    id: item.id || createId('reminder'),
+    parentId: item.parentId || '',
+    parentTitle: item.parentTitle || item.title || '',
+    date: item.date || '',
+    status: item.status || 'activo',
+  }
 }
 
 function useIsMobile(breakpoint = 820) {
@@ -230,7 +322,7 @@ function UpdateBanner({ onUpdate, onDismiss }: UpdateBannerProps) {
   )
 }
 
-function SearchSheet({ open, onClose, go, onOpenTask }: SearchSheetProps) {
+function SearchSheet({ open, onClose, go, onOpenTask, tasks, notes }: SearchSheetProps) {
   const [q, setQ] = useState('')
   const inputRef = useRef<HTMLInputElement | null>(null)
 
@@ -240,11 +332,11 @@ function SearchSheet({ open, onClose, go, onOpenTask }: SearchSheetProps) {
     }
   }, [open])
 
-  const tasks = DATA.tasks.filter((task) =>
+  const matchingTasks = tasks.filter((task) =>
     task.title.toLowerCase().includes(q.toLowerCase()),
   )
 
-  const notes = DATA.notes.filter((note) =>
+  const matchingNotes = notes.filter((note) =>
     note.title.toLowerCase().includes(q.toLowerCase()),
   )
 
@@ -282,7 +374,7 @@ function SearchSheet({ open, onClose, go, onOpenTask }: SearchSheetProps) {
       </div>
 
       <div style={{ marginTop: 16 }}>
-        {q && tasks.length === 0 && notes.length === 0 && (
+        {q && matchingTasks.length === 0 && matchingNotes.length === 0 && (
           <EmptyState
             icon="search"
             title="Sin resultados"
@@ -290,7 +382,7 @@ function SearchSheet({ open, onClose, go, onOpenTask }: SearchSheetProps) {
           />
         )}
 
-        {tasks.length > 0 && (
+        {matchingTasks.length > 0 && (
           <div
             style={{
               fontSize: 11.5,
@@ -305,7 +397,7 @@ function SearchSheet({ open, onClose, go, onOpenTask }: SearchSheetProps) {
           </div>
         )}
 
-        {tasks.slice(0, 4).map((task) => (
+        {matchingTasks.slice(0, 4).map((task) => (
           <button
             key={task.id}
             onClick={() => {
@@ -332,7 +424,7 @@ function SearchSheet({ open, onClose, go, onOpenTask }: SearchSheetProps) {
           </button>
         ))}
 
-        {notes.length > 0 && (
+        {matchingNotes.length > 0 && (
           <div
             style={{
               fontSize: 11.5,
@@ -347,7 +439,7 @@ function SearchSheet({ open, onClose, go, onOpenTask }: SearchSheetProps) {
           </div>
         )}
 
-        {notes.slice(0, 4).map((note) => (
+        {matchingNotes.slice(0, 4).map((note) => (
           <button
             key={note.id}
             onClick={() => {
@@ -540,6 +632,14 @@ export default function App() {
   const [t, setTweak] = useTweaks<TweakValues>(TWEAK_DEFAULTS)
   const theme = t.dark ? 'dark' : 'light'
   const isMobile = useIsMobile()
+  const {
+    tasks,
+    notes,
+    reminders,
+    events,
+    scheduleBlocks,
+    actions: dataActions,
+  } = useData()
 
   window.__UPTGO_MOBILE__ = isMobile
 
@@ -551,9 +651,6 @@ export default function App() {
 
   const [reminderModalOpen, setReminderModalOpen] = useState(false)
   const [reminderParent, setReminderParent] = useState<ReminderParent | null>(null)
-  const [createdScheduleBlocks, setCreatedScheduleBlocks] = useState<any[]>([])
-  const [notes, setNotes] = useState<any[]>(DATA.notes as any[])
-  const [taskNotesMap, setTaskNotesMap] = useState<Record<string, any[]>>({})
   const [createNoteTaskId, setCreateNoteTaskId] = useState<string | null>(null)
   const mainRef = useRef<HTMLElement | null>(null)
   const [headerCollapsed, setHeaderCollapsed] = useState(false)
@@ -568,8 +665,6 @@ export default function App() {
   })
 
   const [openTaskId, setOpenTaskId] = useState<string | number | null>(null)
-  const [tasks, setTasks] = useState(DATA.tasks)
-  const [reminders, setReminders] = useState(DATA.reminders)
   const [sheet, setSheet] = useState<SheetType>(null)
   const [toastMsg, setToastMsg] = useState('')
   const [createModalType, setCreateModalType] = useState<CreateItemType | null>(
@@ -636,12 +731,12 @@ export default function App() {
     return Number(hour)
   }
 
-  const addCreatedClassToSchedule = (item: any) => {
+  const addCreatedClassToSchedule = async (item: any) => {
     if (item.type !== 'clase') return
 
     const subjectColor =
       item.subjectMode === 'new'
-        ? ((createdScheduleBlocks.length % 6) + 1)
+        ? ((scheduleBlocks.length % 6) + 1)
         : undefined
 
     const subjectData =
@@ -674,30 +769,12 @@ export default function App() {
       }))
       .filter((block: any) => block.day !== undefined)
 
-    setCreatedScheduleBlocks((current) => [...blocks, ...current])
+    await dataActions.scheduleBlocks.upsertMany(blocks)
     setRoute('schedule')
   }
-  const addNote = (item: any) => {
-    const noteType = item.noteType || 'texto'
-    const normalizedType = noteType === 'imagen' ? 'foto' : noteType
-    const newNote = {
-      id: item.id,
-      title: item.title,
-      subject: item.subject || '',
-      type: normalizedType,
-      noteType,
-      date: new Date().toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }),
-      tags: typeof item.tags === 'string'
-        ? item.tags.split(',').map((t: string) => t.trim()).filter(Boolean)
-        : (item.tags || []),
-      preview: item.noteText || item.attachmentName || '',
-      noteText: item.noteText || '',
-      duration: item.duration || '',
-      audioUrl: item.audioUrl || null,
-      imageUrl: item.imageUrl || null,
-      location: item.location || '',
-    }
-    setNotes((prev) => [newNote, ...prev])
+
+  const addNote = async (item: any, taskId?: string | null) => {
+    await dataActions.notes.upsert(normalizeNoteItem(item, taskId))
   }
 
   useEffect(() => {
@@ -716,35 +793,27 @@ export default function App() {
     return () => el.removeEventListener('scroll', handler)
   }, [])
 
-  const updateTask = (id: string | number, changes: Record<string, unknown>) => {
-    setTasks((prev: any[]) => prev.map((t: any) => (t.id === id ? { ...t, ...changes } : t)))
+  const updateTask = async (id: string | number, changes: Record<string, unknown>) => {
+    await dataActions.tasks.update(id, changes as any)
   }
 
-  const toggleTask = (id: string | number) => {
-    setTasks((currentTasks) =>
-      currentTasks.map((task) =>
-        task.id === id
-          ? {
-            ...task,
-            done: !task.done,
-            status: !task.done ? 'entregada' : 'pendiente',
-          }
-          : task,
-      ),
-    )
+  const toggleTask = async (id: string | number) => {
+    const task = tasks.find((item) => item.id === id)
+    if (!task) return
+
+    await dataActions.tasks.update(id, {
+      done: !task.done,
+      status: !task.done ? 'entregada' : 'pendiente',
+    })
   }
 
-  const toggleReminder = (id: string | number) => {
-    setReminders((currentReminders) =>
-      currentReminders.map((reminder) =>
-        reminder.id === id
-          ? {
-            ...reminder,
-            status: reminder.status === 'activo' ? 'completado' : 'activo',
-          }
-          : reminder,
-      ),
-    )
+  const toggleReminder = async (id: string | number) => {
+    const reminder = reminders.find((item) => item.id === id)
+    if (!reminder) return
+
+    await dataActions.reminders.update(id, {
+      status: reminder.status === 'activo' ? 'completado' : 'activo',
+    })
   }
 
   const unread = DATA.notifications.filter((notification) => notification.unread)
@@ -775,7 +844,7 @@ export default function App() {
         onToggle={toggleTask}
         toast={toast}
         onCreateReminder={openReminderModal}
-        taskNotes={taskNotesMap[String(openTaskId)] || []}
+        taskNotes={notes.filter((note) => String(note.parentId || '') === String(openTaskId))}
         onAddNote={() => {
           setCreateNoteTaskId(String(openTaskId))
           setCreateModalType('nota')
@@ -803,6 +872,19 @@ export default function App() {
             m={isMobile}
             go={go}
             onAdd={() => setCreateModalType('evento')}
+            events={events}
+            onCreated={async (item: any) => {
+              if (item.type === 'evento') {
+                await dataActions.events.upsert(normalizeEventItem(item))
+                toast('Evento creado correctamente')
+              } else if (item.type === 'tarea') {
+                await dataActions.tasks.upsert(normalizeTaskItem(item))
+                toast('Tarea creada correctamente')
+              } else if (item.type === 'clase') {
+                await addCreatedClassToSchedule(item)
+                toast('Clase creada correctamente')
+              }
+            }}
           />
         )
         break
@@ -811,10 +893,10 @@ export default function App() {
         screen = (
           <Schedule
             m={isMobile}
-            scheduleItems={createdScheduleBlocks}
+            scheduleItems={scheduleBlocks}
             onAdd={() => setCreateModalType('clase')}
             toast={toast}
-            onImportSchedule={(blocks: any[]) => setCreatedScheduleBlocks((prev) => [...blocks, ...prev])}
+            onImportSchedule={(blocks: any[]) => dataActions.scheduleBlocks.upsertMany(blocks)}
           />
         )
         break
@@ -826,7 +908,7 @@ export default function App() {
             onAdd={() => setCreateModalType('nota')}
             toast={toast}
             notes={notes}
-            onDeleteNote={(id: string) => setNotes((prev: any[]) => prev.filter((n: any) => n.id !== id))}
+            onDeleteNote={(id: string) => dataActions.notes.remove(id)}
           />
         )
         break
@@ -869,6 +951,7 @@ export default function App() {
             m={isMobile}
             go={go}
             tasks={tasks}
+            events={events}
             onToggle={toggleTask}
             onOpenTask={openTask}
             variant={t.homeVariant}
@@ -964,6 +1047,8 @@ export default function App() {
           onClose={() => setSheet(null)}
           go={go}
           onOpenTask={openTask}
+          tasks={tasks}
+          notes={notes}
         />
 
         <NotifSheet
@@ -993,41 +1078,26 @@ export default function App() {
           type={createModalType || 'evento'}
           onClose={() => setCreateModalType(null)}
           onCreated={(item) => {
+            void (async () => {
             if (item.type === 'clase') {
-              addCreatedClassToSchedule(item)
+              await addCreatedClassToSchedule(item)
+            } else if (item.type === 'evento') {
+              await dataActions.events.upsert(normalizeEventItem(item))
+            } else if (item.type === 'tarea') {
+              await dataActions.tasks.upsert(normalizeTaskItem(item))
             } else if (item.type === 'nota') {
               if (createNoteTaskId) {
-                const noteType = item.noteType || 'texto'
-                const newNote = {
-                  id: item.id,
-                  title: item.title,
-                  subject: item.subject || '',
-                  type: noteType === 'imagen' ? 'foto' : noteType,
-                  noteType,
-                  date: new Date().toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }),
-                  tags: typeof item.tags === 'string'
-                    ? item.tags.split(',').map((tg: string) => tg.trim()).filter(Boolean)
-                    : (item.tags || []),
-                  preview: item.noteText || item.attachmentName || '',
-                  noteText: item.noteText || '',
-                  duration: item.duration || '',
-                  audioUrl: item.audioUrl || null,
-                  imageUrl: item.imageUrl || null,
-                  location: item.location || '',
-                }
-                setTaskNotesMap((prev) => ({
-                  ...prev,
-                  [createNoteTaskId]: [newNote, ...(prev[createNoteTaskId] || [])],
-                }))
+                await addNote(item, createNoteTaskId)
                 setCreateNoteTaskId(null)
               } else {
-                addNote(item)
+                await addNote(item)
               }
             }
 
             toast(
               `${TYPE_LABEL_TEXT[item.type as CreateItemType]} creado correctamente`,
             )
+            })()
           }}
         />
 
@@ -1039,7 +1109,7 @@ export default function App() {
             setReminderParent(null)
           }}
           onCreated={(reminder) => {
-            setReminders((currentReminders) => [reminder, ...currentReminders])
+            void dataActions.reminders.upsert(normalizeReminderItem(reminder))
             toast(`Recordatorio creado para ${reminder.parentTitle}`)
           }}
         />
