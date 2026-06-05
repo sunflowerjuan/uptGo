@@ -1,5 +1,4 @@
 import React from 'react'
-import { DATA } from '../data/data'
 import { Icon } from '../components/Icons'
 import {
   Button,
@@ -11,8 +10,107 @@ import {
   cVar,
   subjectById,
 } from '../components/UI'
+import type { DbNote } from '../services/db'
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyProps = Record<string, any>
+
+export function NoteDetailModal({ note, m, onClose, onDelete }: AnyProps) {
+  const s = subjectById(note.subject)
+  const [playing, setPlaying] = React.useState(false)
+  const [confirmDelete, setConfirmDelete] = React.useState(false)
+  const audioRef = React.useRef<HTMLAudioElement | null>(null)
+  const noteType: string = note.type || note.noteType || 'texto'
+
+  const handlePlayPause = () => {
+    if (!audioRef.current) return
+    if (playing) { audioRef.current.pause(); setPlaying(false) }
+    else { void audioRef.current.play(); setPlaying(true) }
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 120, background: 'oklch(0 0 0 / 0.30)', display: 'flex', alignItems: m ? 'flex-end' : 'center', justifyContent: 'center', padding: m ? '0' : 20 }} onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: m ? '100%' : 560, maxWidth: '100%', maxHeight: m ? '92dvh' : 'calc(100dvh - 40px)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: m ? '22px 22px 0 0' : 22, boxShadow: 'var(--shadow-pop)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding: '18px 20px 14px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexShrink: 0 }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
+              <Pill color={cVar(s.color)} bg={cSoftVar(s.color)} dot>{s.name}</Pill>
+              <span style={{ fontSize: 11.5, color: 'var(--text-3)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                <Icon name={noteType === 'audio' ? 'mic' : noteType === 'foto' || noteType === 'imagen' ? 'image' : noteType === 'ubicacion' ? 'mapPin' : 'notes'} size={13} />
+                {note.date}
+              </span>
+            </div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', fontFamily: 'var(--font-display)', lineHeight: 1.2 }}>{note.title}</div>
+          </div>
+          <button onClick={onClose} style={{ width: 34, height: 34, borderRadius: 'var(--r-full)', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Icon name="x" size={15} />
+          </button>
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
+          {noteType === 'texto' && (
+            <div style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+              {note.noteText || note.preview || 'Sin contenido.'}
+            </div>
+          )}
+
+          {noteType === 'audio' && (
+            <div>
+              {note.audioUrl && <audio ref={audioRef} src={note.audioUrl} onEnded={() => setPlaying(false)} style={{ display: 'none' }} />}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', background: 'var(--surface-2)', borderRadius: 'var(--r-md)', border: '1px solid var(--border)' }}>
+                <button onClick={handlePlayPause} style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--primary)', color: 'var(--on-primary)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+                  <Icon name={playing ? 'pause' : 'play'} size={18} />
+                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 2, height: 30, flex: 1 }}>
+                  {[8, 14, 22, 16, 28, 12, 20, 30, 18, 10].map((h, i) => (
+                    <div key={i} style={{ width: 3, height: h, borderRadius: 2, background: cVar(s.color), opacity: playing ? 1 : 0.45 }} />
+                  ))}
+                </div>
+                <span style={{ fontSize: 12, color: 'var(--text-2)', fontFamily: 'var(--font-display)', fontWeight: 600, whiteSpace: 'nowrap' }}>{note.duration || '0:00'}</span>
+              </div>
+              {!note.audioUrl && <p style={{ fontSize: 13, color: 'var(--text-3)', marginTop: 12 }}>No hay archivo de audio disponible.</p>}
+            </div>
+          )}
+
+          {(noteType === 'foto' || noteType === 'imagen') && (
+            <div>
+              {note.imageUrl
+                ? <img src={note.imageUrl} alt={note.title} style={{ width: '100%', borderRadius: 'var(--r-md)', display: 'block' }} />
+                : <div style={{ height: 180, borderRadius: 'var(--r-md)', background: 'repeating-linear-gradient(135deg, var(--surface-2), var(--surface-2) 9px, var(--bg-tint) 9px, var(--bg-tint) 18px)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{ fontSize: 12, color: 'var(--text-3)', background: 'var(--surface)', padding: '4px 9px', borderRadius: 'var(--r-full)', border: '1px solid var(--border)' }}>Sin imagen</span>
+                  </div>
+              }
+              {note.noteText && <p style={{ fontSize: 13.5, color: 'var(--text)', lineHeight: 1.6, marginTop: 14 }}>{note.noteText}</p>}
+            </div>
+          )}
+
+          {note.tags && note.tags.length > 0 && (
+            <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginTop: 16 }}>
+              {note.tags.map((tag: string) => (
+                <span key={tag} style={{ fontSize: 11, color: 'var(--text-3)', background: 'var(--surface-2)', padding: '3px 9px', borderRadius: 'var(--r-full)', border: '1px solid var(--border)' }}>#{tag}</span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', gap: 10, flexShrink: 0 }}>
+          {onDelete && !confirmDelete && (
+            <button onClick={() => setConfirmDelete(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 'var(--r-sm)', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--danger)', fontFamily: 'var(--font-ui)', fontSize: 13, cursor: 'pointer' }}>
+              <Icon name="trash" size={14} />Eliminar
+            </button>
+          )}
+          {confirmDelete && (
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setConfirmDelete(false)} style={{ padding: '8px 14px', borderRadius: 'var(--r-sm)', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-2)', fontFamily: 'var(--font-ui)', fontSize: 13, cursor: 'pointer' }}>Cancelar</button>
+              <button onClick={() => { onDelete?.(note.id); onClose() }} style={{ padding: '8px 14px', borderRadius: 'var(--r-sm)', border: 'none', background: 'var(--danger)', color: '#fff', fontFamily: 'var(--font-ui)', fontSize: 13, cursor: 'pointer' }}>Confirmar</button>
+            </div>
+          )}
+          <button onClick={onClose} style={{ marginLeft: 'auto', padding: '8px 18px', borderRadius: 'var(--r-sm)', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-2)', fontFamily: 'var(--font-ui)', fontSize: 13, cursor: 'pointer' }}>Cerrar</button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function Waveform({ color, playing }: AnyProps) {
   const bars = [8, 14, 22, 16, 28, 12, 20, 30, 18, 10, 24, 16, 26, 14, 9, 19, 13, 22]
@@ -163,8 +261,10 @@ function NoteCard({ n, onOpen }: AnyProps) {
   )
 }
 
-export function Notes({ m, onAdd, toast }: AnyProps) {
+export function Notes({ m, onAdd, toast, notes: notesProp, onDeleteNote }: AnyProps) {
+  const notesList: DbNote[] = (notesProp as DbNote[] | undefined) ?? []
   const [type, setType] = React.useState('all')
+  const [selectedNote, setSelectedNote] = React.useState<DbNote | null>(null)
   const types = [
     ['all', 'Todas', 'layers'],
     ['texto', 'Texto', 'notes'],
@@ -172,7 +272,7 @@ export function Notes({ m, onAdd, toast }: AnyProps) {
     ['foto', 'Fotos', 'image'],
   ]
 
-  const list = DATA.notes.filter((note: any) => type === 'all' || note.type === type)
+  const list = notesList.filter((note: DbNote) => type === 'all' || note.type === type)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -181,7 +281,7 @@ export function Notes({ m, onAdd, toast }: AnyProps) {
           <div>
             {m && <h1 style={{ fontSize: 22, fontWeight: 600, color: 'var(--text)', fontFamily: 'var(--font-display)', letterSpacing: '-0.02em' }}>Notas</h1>}
             <p style={{ fontSize: 13, color: 'var(--text-3)', marginTop: m ? 3 : 0 }}>
-              {DATA.notes.length} apuntes · guardados localmente
+              {notesList.length} apuntes · guardados localmente
             </p>
           </div>
 
@@ -219,12 +319,25 @@ export function Notes({ m, onAdd, toast }: AnyProps) {
       </FadeIn>
 
       <div style={{ display: 'grid', gridTemplateColumns: m ? '1fr' : 'repeat(auto-fill, minmax(260px, 1fr))', gap: 14 }}>
-        {list.map((n: any, i: number) => (
+        {list.map((n: DbNote, i: number) => (
           <FadeIn key={n.id} delay={90 + i * 40}>
-            <NoteCard n={n} onOpen={() => toast('Abrir nota: ' + n.title)} />
+            <NoteCard n={n} onOpen={(note: DbNote) => setSelectedNote(note)} />
           </FadeIn>
         ))}
       </div>
+
+      {selectedNote && (
+        <NoteDetailModal
+          note={selectedNote}
+          m={m}
+          onClose={() => setSelectedNote(null)}
+          onDelete={(id: string) => {
+            onDeleteNote?.(id)
+            if (!onDeleteNote) toast?.('Nota eliminada')
+            setSelectedNote(null)
+          }}
+        />
+      )}
     </div>
   )
 }

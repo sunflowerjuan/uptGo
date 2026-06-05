@@ -1,7 +1,8 @@
 import React from 'react'
-import { DATA } from '../data/data'
 import { Button } from './UI'
 import { Icon } from './Icons'
+import { useData } from '../contexts/DataContext'
+import type { DbTask, DbEvent, DbScheduleBlock } from '../services/db'
 
 export type ReminderParentType = 'tarea' | 'evento' | 'clase'
 
@@ -102,39 +103,36 @@ function getParentKey(parent: ReminderParent) {
   return `${parent.type}:${parent.id}`
 }
 
-function buildParentOptions(): ReminderParent[] {
-  const taskParents: ReminderParent[] = DATA.tasks.map((task: any) => ({
+function buildParentOptions(
+  tasks: DbTask[],
+  events: DbEvent[],
+  scheduleBlocks: DbScheduleBlock[],
+): ReminderParent[] {
+  const taskParents: ReminderParent[] = tasks.map((task) => ({
     id: task.id,
-    type: 'tarea',
+    type: 'tarea' as const,
     title: task.title,
-    date: task.dueDate || task.dueShort || '',
-    time: task.dueTime || '',
+    date: task.dueDate ?? task.dueShort ?? '',
+    time: task.dueTime ?? '',
     subtitle: task.subject ? 'Tarea académica' : 'Tarea',
   }))
 
-  const eventParents: ReminderParent[] = DATA.events.map((event: any) => ({
+  const eventParents: ReminderParent[] = events.map((event) => ({
     id: event.id,
-    type: 'evento',
+    type: 'evento' as const,
     title: event.title,
-    date: event.date || '',
-    time: event.time || '',
-    subtitle: event.loc || 'Evento',
+    date: event.date ?? '',
+    time: event.time ?? '',
+    subtitle: event.loc ?? 'Evento',
   }))
 
-  const classParents: ReminderParent[] = DATA.schedule.map((block: any, index: number) => {
-    const subject =
-      DATA.subjects.find((item: any) => item.id === block.subject) ||
-      DATA.subjects.find((item: any) => item.color === block.subject) ||
-      DATA.subjects[0]
-
-    return {
-      id: `class-${block.day}-${block.start}-${block.subject}-${index}`,
-      type: 'clase',
-      title: subject?.name || 'Clase',
-      time: `${block.start}:00`,
-      subtitle: subject?.room || 'Clase académica',
-    }
-  })
+  const classParents: ReminderParent[] = scheduleBlocks.map((block) => ({
+    id: block.id,
+    type: 'clase' as const,
+    title: block.title || block.subject,
+    time: `${block.start}:00`,
+    subtitle: block.room || 'Clase académica',
+  }))
 
   return [...taskParents, ...eventParents, ...classParents]
 }
@@ -145,7 +143,11 @@ export function CreateReminderModal({
   onClose,
   onCreated,
 }: CreateReminderModalProps) {
-  const parentOptions = React.useMemo(() => buildParentOptions(), [])
+  const { tasks, events, scheduleBlocks } = useData()
+  const parentOptions = React.useMemo(
+    () => buildParentOptions(tasks, events, scheduleBlocks),
+    [tasks, events, scheduleBlocks],
+  )
   const [form, setForm] = React.useState(DEFAULT_FORM)
   const [error, setError] = React.useState('')
 

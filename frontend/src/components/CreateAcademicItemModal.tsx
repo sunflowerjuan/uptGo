@@ -51,6 +51,9 @@ const DEFAULT_FORM = {
     noteType: 'texto',
     noteText: '',
     tags: '',
+    noteAttachmentName: '',
+    audioUrl: '',
+    imageUrl: '',
     repeat: 'unica',
     notifyBefore: '15',
     attachmentName: '',
@@ -161,6 +164,11 @@ export function CreateAcademicItemModal({
 }: CreateAcademicItemModalProps) {
     const [form, setForm] = React.useState<FormState>(DEFAULT_FORM)
     const [error, setError] = React.useState('')
+    const [recording, setRecording] = React.useState(false)
+    const fileInputRef = React.useRef<HTMLInputElement | null>(null)
+    const cameraInputRef = React.useRef<HTMLInputElement | null>(null)
+    const mediaRecorderRef = React.useRef<MediaRecorder | null>(null)
+    const audioChunksRef = React.useRef<Blob[]>([])
 
     React.useEffect(() => {
         if (!open) return
@@ -171,6 +179,7 @@ export function CreateAcademicItemModal({
             date: initialDate || '',
             dueDate: initialDate || '',
         })
+        setRecording(false)
     }, [open, initialDate, type])
 
     if (!open) return null
@@ -246,11 +255,67 @@ export function CreateAcademicItemModal({
             }
         }
 
-        if (type === 'nota' && form.noteType === 'texto' && !form.noteText.trim()) {
-            return 'Escribe el contenido de la nota.'
+        if (type === 'nota') {
+            if (form.noteType === 'texto' && !form.noteText.trim()) {
+                return 'Escribe el contenido de la nota.'
+            }
+
+            if (form.noteType === 'audio' && !form.audioUrl) {
+                return 'Graba un audio o sube un archivo de audio.'
+            }
+
+            if (form.noteType === 'imagen' && !form.imageUrl) {
+                return 'Toma una foto o sube una imagen.'
+            }
         }
 
         return ''
+    }
+
+    const handleNoteFileSelected = (
+        event: React.ChangeEvent<HTMLInputElement>,
+        kind: 'audio' | 'imagen' | 'documento',
+    ) => {
+        const file = event.target.files?.[0]
+        if (!file) return
+
+        const url = URL.createObjectURL(file)
+        update('noteAttachmentName', file.name)
+        update('attachmentName', file.name)
+
+        if (kind === 'audio') update('audioUrl', url)
+        if (kind === 'imagen') update('imageUrl', url)
+
+        event.target.value = ''
+    }
+
+    const toggleRecording = async () => {
+        if (recording) {
+            mediaRecorderRef.current?.stop()
+            setRecording(false)
+            return
+        }
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+            const recorder = new MediaRecorder(stream)
+            audioChunksRef.current = []
+            recorder.ondataavailable = (event) => {
+                if (event.data.size > 0) audioChunksRef.current.push(event.data)
+            }
+            recorder.onstop = () => {
+                const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType || 'audio/webm' })
+                update('audioUrl', URL.createObjectURL(blob))
+                update('noteAttachmentName', `grabacion-${Date.now()}.webm`)
+                update('attachmentName', `grabacion-${Date.now()}.webm`)
+                stream.getTracks().forEach((track) => track.stop())
+            }
+            mediaRecorderRef.current = recorder
+            recorder.start()
+            setRecording(true)
+        } catch {
+            setError('No se pudo acceder al micrófono.')
+        }
     }
 
     const handleSave = () => {
@@ -1095,23 +1160,52 @@ export function CreateAcademicItemModal({
 
                             {['audio', 'imagen', 'documento'].includes(form.noteType) && (
                                 <Field label="Adjunto">
-                                    <input
-                                        type="file"
-                                        accept={
-                                            form.noteType === 'audio'
-                                                ? 'audio/*'
-                                                : form.noteType === 'imagen'
-                                                    ? 'image/*'
-                                                    : '.pdf,.doc,.docx,.xls,.xlsx,image/*'
-                                        }
-                                        onChange={(event) =>
-                                            update('attachmentName', event.target.files?.[0]?.name || '')
-                                        }
-                                        style={{
-                                            ...inputStyle(),
-                                            paddingTop: 9,
-                                        }}
-                                    />
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                        <input
+                                            ref={fileInputRef}
+                                            type="file"
+                                            accept={
+                                                form.noteType === 'audio'
+                                                    ? 'audio/*'
+                                                    : form.noteType === 'imagen'
+                                                        ? 'image/*'
+                                                        : '.pdf,.doc,.docx,.xls,.xlsx,image/*'
+                                            }
+                                            onChange={(event) => handleNoteFileSelected(event, form.noteType as 'audio' | 'imagen' | 'documento')}
+                                            style={{ display: 'none' }}
+                                        />
+                                        {form.noteType === 'imagen' && (
+                                            <input
+                                                ref={cameraInputRef}
+                                                type="file"
+                                                accept="image/*"
+                                                capture="environment"
+                                                onChange={(event) => handleNoteFileSelected(event, 'imagen')}
+                                                style={{ display: 'none' }}
+                                            />
+                                        )}
+                                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                            {form.noteType === 'audio' && (
+                                                <Button variant={recording ? 'primary' : 'soft'} size="sm" icon={recording ? 'pause' : 'mic'} onClick={toggleRecording}>
+                                                    {recording ? 'Detener' : 'Grabar'}
+                                                </Button>
+                                            )}
+                                            {form.noteType === 'imagen' && (
+                                                <Button variant="soft" size="sm" icon="camera" onClick={() => cameraInputRef.current?.click()}>
+                                                    Tomar foto
+                                                </Button>
+                                            )}
+                                            <Button variant="soft" size="sm" icon="paperclip" onClick={() => fileInputRef.current?.click()}>
+                                                Subir archivo
+                                            </Button>
+                                        </div>
+                                        {form.noteAttachmentName && (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 38, borderRadius: 'var(--r-sm)', border: '1px solid var(--border)', background: 'var(--surface-2)', padding: '8px 10px', color: 'var(--text-2)', fontSize: 12.5 }}>
+                                                <Icon name={form.noteType === 'audio' ? 'mic' : form.noteType === 'imagen' ? 'image' : 'paperclip'} size={15} />
+                                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{form.noteAttachmentName}</span>
+                                            </div>
+                                        )}
+                                    </div>
                                 </Field>
                             )}
 
