@@ -842,7 +842,7 @@ function AttachmentChip({
   )
 }
 
-function EditTaskSheet({ task, m, onClose, onSave }: AnyProps) {
+function EditTaskSheet({ task, onClose, onSave }: AnyProps) {
   const [form, setForm] = React.useState({
     title: task.title || '',
     subject: task.subject || '',
