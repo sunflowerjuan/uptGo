@@ -1,5 +1,6 @@
 import { DATA } from './data/data'
 import { useEffect, useRef, useState } from 'react'
+import { useRegisterSW } from 'virtual:pwa-register/react'
 import { useAuth } from './contexts/AuthContext'
 import { Icon } from './components/Icons'
 import { Sheet, EmptyState, cSoftVar, cVar } from './components/UI'
@@ -150,6 +151,81 @@ function Toast({ msg }: ToastProps) {
     >
       <Icon name="check" size={15} color="var(--bg)" stroke={2.4} />
       {msg}
+    </div>
+  )
+}
+
+type UpdateBannerProps = {
+  onUpdate: () => void
+  onDismiss: () => void
+}
+
+function UpdateBanner({ onUpdate, onDismiss }: UpdateBannerProps) {
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        bottom: 24,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        zIndex: 90,
+        background: 'var(--surface)',
+        border: '1px solid var(--border-strong)',
+        borderRadius: 'var(--r-lg)',
+        boxShadow: 'var(--shadow-pop)',
+        padding: '14px 18px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 14,
+        maxWidth: 'calc(100vw - 32px)',
+        width: 'max-content',
+      }}
+    >
+      <Icon name="download" size={18} color="var(--primary)" />
+      <span
+        style={{
+          fontSize: 13.5,
+          fontWeight: 500,
+          color: 'var(--text)',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        Nueva versión disponible
+      </span>
+      <div style={{ display: 'flex', gap: 8, marginLeft: 4 }}>
+        <button
+          onClick={onUpdate}
+          style={{
+            padding: '6px 14px',
+            borderRadius: 'var(--r-full)',
+            background: 'var(--primary)',
+            color: 'var(--on-primary)',
+            border: 'none',
+            fontFamily: 'var(--font-ui)',
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          Actualizar
+        </button>
+        <button
+          onClick={onDismiss}
+          style={{
+            padding: '6px 10px',
+            borderRadius: 'var(--r-full)',
+            background: 'transparent',
+            color: 'var(--text-3)',
+            border: '1px solid var(--border)',
+            fontFamily: 'var(--font-ui)',
+            fontSize: 13,
+            cursor: 'pointer',
+          }}
+        >
+          Más tarde
+        </button>
+      </div>
     </div>
   )
 }
@@ -467,9 +543,21 @@ export default function App() {
 
   window.__UPTGO_MOBILE__ = isMobile
 
+  const [updateDismissed, setUpdateDismissed] = useState(false)
+  const {
+    needRefresh: [needRefresh],
+    updateServiceWorker,
+  } = useRegisterSW()
+
   const [reminderModalOpen, setReminderModalOpen] = useState(false)
   const [reminderParent, setReminderParent] = useState<ReminderParent | null>(null)
   const [createdScheduleBlocks, setCreatedScheduleBlocks] = useState<any[]>([])
+  const [notes, setNotes] = useState<any[]>(DATA.notes as any[])
+  const [taskNotesMap, setTaskNotesMap] = useState<Record<string, any[]>>({})
+  const [createNoteTaskId, setCreateNoteTaskId] = useState<string | null>(null)
+  const mainRef = useRef<HTMLElement | null>(null)
+  const [headerCollapsed, setHeaderCollapsed] = useState(false)
+  const lastScrollY = useRef(0)
 
   const { isAuthenticated, user: authUser, logout: authLogout, handleOAuthCallback, needsProfileCompletion } = useAuth()
   const [profilePromptDismissed, setProfilePromptDismissed] = useState(false)
@@ -589,6 +677,49 @@ export default function App() {
     setCreatedScheduleBlocks((current) => [...blocks, ...current])
     setRoute('schedule')
   }
+  const addNote = (item: any) => {
+    const noteType = item.noteType || 'texto'
+    const normalizedType = noteType === 'imagen' ? 'foto' : noteType
+    const newNote = {
+      id: item.id,
+      title: item.title,
+      subject: item.subject || '',
+      type: normalizedType,
+      noteType,
+      date: new Date().toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }),
+      tags: typeof item.tags === 'string'
+        ? item.tags.split(',').map((t: string) => t.trim()).filter(Boolean)
+        : (item.tags || []),
+      preview: item.noteText || item.attachmentName || '',
+      noteText: item.noteText || '',
+      duration: item.duration || '',
+      audioUrl: item.audioUrl || null,
+      imageUrl: item.imageUrl || null,
+      location: item.location || '',
+    }
+    setNotes((prev) => [newNote, ...prev])
+  }
+
+  useEffect(() => {
+    const el = mainRef.current
+    if (!el) return
+    const handler = () => {
+      const currentY = el.scrollTop
+      if (currentY > lastScrollY.current + 8) {
+        setHeaderCollapsed(true)
+      } else if (currentY < lastScrollY.current - 8) {
+        setHeaderCollapsed(false)
+      }
+      lastScrollY.current = currentY
+    }
+    el.addEventListener('scroll', handler, { passive: true })
+    return () => el.removeEventListener('scroll', handler)
+  }, [])
+
+  const updateTask = (id: string | number, changes: Record<string, unknown>) => {
+    setTasks((prev: any[]) => prev.map((t: any) => (t.id === id ? { ...t, ...changes } : t)))
+  }
+
   const toggleTask = (id: string | number) => {
     setTasks((currentTasks) =>
       currentTasks.map((task) =>
@@ -644,6 +775,12 @@ export default function App() {
         onToggle={toggleTask}
         toast={toast}
         onCreateReminder={openReminderModal}
+        taskNotes={taskNotesMap[String(openTaskId)] || []}
+        onAddNote={() => {
+          setCreateNoteTaskId(String(openTaskId))
+          setCreateModalType('nota')
+        }}
+        onUpdateTask={updateTask}
       />
     )
   } else {
@@ -677,6 +814,7 @@ export default function App() {
             scheduleItems={createdScheduleBlocks}
             onAdd={() => setCreateModalType('clase')}
             toast={toast}
+            onImportSchedule={(blocks: any[]) => setCreatedScheduleBlocks((prev) => [...blocks, ...prev])}
           />
         )
         break
@@ -687,6 +825,8 @@ export default function App() {
             m={isMobile}
             onAdd={() => setCreateModalType('nota')}
             toast={toast}
+            notes={notes}
+            onDeleteNote={(id: string) => setNotes((prev: any[]) => prev.filter((n: any) => n.id !== id))}
           />
         )
         break
@@ -770,6 +910,7 @@ export default function App() {
             onTheme={() => setTweak('dark', !t.dark)}
             theme={theme}
             unread={unread}
+            collapsed={headerCollapsed}
           />
         )}
 
@@ -795,12 +936,14 @@ export default function App() {
         )}
 
         <main
+          ref={mainRef}
           className="uptgo-main"
           style={{
             padding: isMobile ? '12px' : '28px',
             minWidth: 0,
             maxWidth: '100%',
             overflowX: 'clip',
+            overflowY: 'auto',
           }}
         >
           <div className={isMobile ? 'uptgo-mobile-content' : 'uptgo-content'}>
@@ -852,6 +995,34 @@ export default function App() {
           onCreated={(item) => {
             if (item.type === 'clase') {
               addCreatedClassToSchedule(item)
+            } else if (item.type === 'nota') {
+              if (createNoteTaskId) {
+                const noteType = item.noteType || 'texto'
+                const newNote = {
+                  id: item.id,
+                  title: item.title,
+                  subject: item.subject || '',
+                  type: noteType === 'imagen' ? 'foto' : noteType,
+                  noteType,
+                  date: new Date().toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }),
+                  tags: typeof item.tags === 'string'
+                    ? item.tags.split(',').map((tg: string) => tg.trim()).filter(Boolean)
+                    : (item.tags || []),
+                  preview: item.noteText || item.attachmentName || '',
+                  noteText: item.noteText || '',
+                  duration: item.duration || '',
+                  audioUrl: item.audioUrl || null,
+                  imageUrl: item.imageUrl || null,
+                  location: item.location || '',
+                }
+                setTaskNotesMap((prev) => ({
+                  ...prev,
+                  [createNoteTaskId]: [newNote, ...(prev[createNoteTaskId] || [])],
+                }))
+                setCreateNoteTaskId(null)
+              } else {
+                addNote(item)
+              }
             }
 
             toast(
@@ -894,6 +1065,12 @@ export default function App() {
       data-palette={t.palette}
     >
       {appInner}
+      {needRefresh && !updateDismissed && (
+        <UpdateBanner
+          onUpdate={() => void updateServiceWorker(true)}
+          onDismiss={() => setUpdateDismissed(true)}
+        />
+      )}
     </div>
   )
 }

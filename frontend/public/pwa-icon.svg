@@ -1,0 +1,19 @@
+<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- Fondo tile con esquinas redondeadas -->
+  <rect width="512" height="512" rx="139" fill="#4a7c59"/>
+  <!-- Forma U (escalada de 48→512, factor ~10.67x) -->
+  <!-- Original path: M16 13 L16 25 A8 8 0 0 0 32 25 L32 13 -->
+  <!-- Escalado: M171 139 L171 267 A85 85 0 0 0 341 267 L341 139 -->
+  <path
+    d="M171 139 L171 267 A85 85 0 0 0 341 267 L341 139"
+    stroke="white"
+    stroke-width="55.5"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    fill="none"
+  />
+  <!-- Círculo sólido (cx=32→341, cy=13→139, r=3.6→38.4) -->
+  <circle cx="341" cy="139" r="38.4" fill="white"/>
+  <!-- Anillo exterior (r=6.4→68.3) -->
+  <circle cx="341" cy="139" r="68.3" stroke="white" stroke-width="17.1" opacity="0.35" fill="none"/>
+</svg>
