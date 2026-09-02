@@ -3,10 +3,9 @@ import { GoogleCampusMap, type CampusPlace } from '../components/GoogleCampusMap
 import { Icon } from '../components/Icons'
 import { Avatar, Button, Card, FadeIn, SectionTitle, Sheet } from '../components/UI'
 import { useAuth } from '../contexts/AuthContext'
-import { useSyncContext } from '../contexts/SyncContext'
 import { ApiError } from '../services/api'
-import { listBackups, downloadAndImportBackup } from '../services/sync.service'
-import type { DriveBackup } from '../services/sync.service'
+import { downloadAndImportBackup, getSyncState, listBackups, syncNow as syncToDrive } from '../services/sync.service'
+import type { DriveBackup, SyncState } from '../services/sync.service'
 import {
   isPushSubscribed,
   isPushSupported,
@@ -386,7 +385,9 @@ const DEFAULT_NOTIF: NotifPrefs = { vencimiento: true, clase: true, recordatorio
 
 export function Settings({ m, theme, onTheme, palette, onPalette, onLogout, toast }: AnyProps) {
   const { user, registerWebAuthn } = useAuth()
-  const { syncStatus, lastSyncAt, syncVersion, syncNow } = useSyncContext()
+  const [syncStatus, setSyncStatus] = React.useState<'idle' | 'syncing' | 'error'>('idle')
+  const [lastSyncAt, setLastSyncAt] = React.useState<string | null>(null)
+  const [syncVersion, setSyncVersion] = React.useState(0)
   const [notif, setNotif] = React.useState<NotifPrefs>(DEFAULT_NOTIF)
   const [pushSubscribed, setPushSubscribed] = React.useState(false)
   const [pushTogglingKey, setPushTogglingKey] = React.useState<string | null>(null)
@@ -425,6 +426,28 @@ export function Settings({ m, theme, onTheme, palette, onPalette, onLogout, toas
   const displayEmail = user?.email ?? ''
   const displayProgram = user?.program ?? null
   const displayInitials = user?.initials ?? (user?.name ? user.name.slice(0, 2).toUpperCase() : '')
+
+  const applySyncState = (state: SyncState) => {
+    setLastSyncAt(state.lastSyncAt)
+    setSyncVersion(state.syncVersion)
+  }
+
+  React.useEffect(() => {
+    void getSyncState().then(applySyncState).catch(() => {})
+  }, [])
+
+  const syncNow = async () => {
+    setSyncStatus('syncing')
+    try {
+      await syncToDrive()
+      const state = await getSyncState()
+      applySyncState(state)
+      setSyncStatus('idle')
+    } catch (error) {
+      setSyncStatus('error')
+      throw error
+    }
+  }
 
   const handleAvatarFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]

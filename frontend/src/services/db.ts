@@ -62,16 +62,26 @@ export type ScheduleBlockRecord = DbRecord & {
   subjectData?: SubjectData | null
 }
 
-type StoreName = 'tasks' | 'notes' | 'reminders' | 'events' | 'scheduleBlocks'
+export type AttachmentRecord = DbRecord & {
+  name: string
+  mimeType: string
+  blob: Blob
+  parentId: string
+  parentType: 'task' | 'note'
+  driveFileId?: string
+}
+
+type StoreName = 'tasks' | 'notes' | 'reminders' | 'events' | 'scheduleBlocks' | 'attachments'
 
 const DB_NAME = 'uptgo_db'
-const DB_VERSION = 1
+const DB_VERSION = 2
 const STORE_NAMES: StoreName[] = [
   'tasks',
   'notes',
   'reminders',
   'events',
   'scheduleBlocks',
+  'attachments',
 ]
 
 let dbPromise: Promise<IDBDatabase> | null = null
@@ -159,3 +169,4 @@ export const notes = createStoreApi<NoteRecord>('notes')
 export const reminders = createStoreApi<ReminderRecord>('reminders')
 export const events = createStoreApi<EventRecord>('events')
 export const scheduleBlocks = createStoreApi<ScheduleBlockRecord>('scheduleBlocks')
+export const attachments = createStoreApi<AttachmentRecord>('attachments')
