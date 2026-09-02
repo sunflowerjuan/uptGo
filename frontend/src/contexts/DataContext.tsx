@@ -5,12 +5,14 @@ import type {
   NoteRecord,
   ReminderRecord,
   ScheduleBlockRecord,
+  SubjectData,
   SyncStatus,
   TaskRecord,
 } from '../services/db'
+import { deriveSubjects, setSubjectsCache } from '../services/subjects'
 
 type Id = string | number
-type NewRecord<T extends { id: Id }> = Omit<T, 'syncStatus' | 'updatedAt'> &
+type NewRecord<T extends db.DbRecord> = Omit<T, 'syncStatus' | 'updatedAt'> &
   Partial<Pick<T, 'syncStatus' | 'updatedAt'>>
 
 type DataContextValue = {
@@ -20,6 +22,7 @@ type DataContextValue = {
   reminders: ReminderRecord[]
   events: EventRecord[]
   scheduleBlocks: ScheduleBlockRecord[]
+  subjects: SubjectData[]
   actions: {
     tasks: CrudActions<TaskRecord>
     notes: CrudActions<NoteRecord>
@@ -31,7 +34,7 @@ type DataContextValue = {
   }
 }
 
-type CrudActions<T extends { id: Id }> = {
+type CrudActions<T extends db.DbRecord> = {
   getById: (id: Id) => Promise<T | undefined>
   upsert: (record: NewRecord<T>) => Promise<T>
   update: (id: Id, changes: Partial<T>) => Promise<T | undefined>
@@ -40,7 +43,7 @@ type CrudActions<T extends { id: Id }> = {
 
 const DataContext = React.createContext<DataContextValue | null>(null)
 
-const markPending = <T extends { id: Id }>(record: NewRecord<T>): T => ({
+const markPending = <T extends db.DbRecord>(record: NewRecord<T>): T => ({
   ...record,
   syncStatus: 'pendingSync' as SyncStatus,
   updatedAt: new Date().toISOString(),
@@ -149,6 +152,15 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
+  const subjects = React.useMemo(
+    () => deriveSubjects(scheduleBlocksState),
+    [scheduleBlocksState],
+  )
+
+  // Se actualiza en el cuerpo del render (no en un efecto) para que subjectById()
+  // ya vea las materias vigentes durante este mismo render, no uno después.
+  setSubjectsCache(subjects)
+
   const value = React.useMemo<DataContextValue>(() => {
     const scheduleCrud = createCrudActions(db.scheduleBlocks, setScheduleBlocksState)
 
@@ -159,6 +171,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       reminders: remindersState,
       events: eventsState,
       scheduleBlocks: scheduleBlocksState,
+      subjects,
       actions: {
         tasks: createCrudActions(db.tasks, setTasksState),
         notes: createCrudActions(db.notes, setNotesState),
@@ -191,6 +204,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     notesState,
     remindersState,
     scheduleBlocksState,
+    subjects,
     tasksState,
   ])
 

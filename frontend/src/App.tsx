@@ -1,4 +1,3 @@
-import { DATA } from './data/data'
 import { useEffect, useRef, useState } from 'react'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 import { useAuth } from './contexts/AuthContext'
@@ -63,6 +62,8 @@ type SearchSheetProps = {
   onOpenTask: (id: number | string) => void
   tasks: any[]
   notes: any[]
+  events: any[]
+  scheduleBlocks: any[]
 }
 
 type NotifSheetProps = {
@@ -322,7 +323,7 @@ function UpdateBanner({ onUpdate, onDismiss }: UpdateBannerProps) {
   )
 }
 
-function SearchSheet({ open, onClose, go, onOpenTask, tasks, notes }: SearchSheetProps) {
+function SearchSheet({ open, onClose, go, onOpenTask, tasks, notes, events, scheduleBlocks }: SearchSheetProps) {
   const [q, setQ] = useState('')
   const inputRef = useRef<HTMLInputElement | null>(null)
 
@@ -332,13 +333,16 @@ function SearchSheet({ open, onClose, go, onOpenTask, tasks, notes }: SearchShee
     }
   }, [open])
 
-  const matchingTasks = tasks.filter((task) =>
-    task.title.toLowerCase().includes(q.toLowerCase()),
-  )
-
-  const matchingNotes = notes.filter((note) =>
-    note.title.toLowerCase().includes(q.toLowerCase()),
-  )
+  const lq = q.toLowerCase()
+  const matchingTasks = q ? tasks.filter((t) => t.title?.toLowerCase().includes(lq)) : []
+  const matchingNotes = q ? notes.filter((n) => n.title?.toLowerCase().includes(lq)) : []
+  const matchingEvents = q ? events.filter((e) => e.title?.toLowerCase().includes(lq)) : []
+  const matchingBlocks = q
+    ? scheduleBlocks.filter((b) => {
+        const name = b.subjectData?.name || b.title || ''
+        return name.toLowerCase().includes(lq)
+      })
+    : []
 
   return (
     <Sheet open={open} onClose={onClose} title="Buscar">
@@ -374,95 +378,60 @@ function SearchSheet({ open, onClose, go, onOpenTask, tasks, notes }: SearchShee
       </div>
 
       <div style={{ marginTop: 16 }}>
-        {q && matchingTasks.length === 0 && matchingNotes.length === 0 && (
-          <EmptyState
-            icon="search"
-            title="Sin resultados"
-            body={`Nada coincide con "${q}".`}
-          />
+        {q && matchingTasks.length === 0 && matchingNotes.length === 0 && matchingEvents.length === 0 && matchingBlocks.length === 0 && (
+          <EmptyState icon="search" title="Sin resultados" body={`Nada coincide con "${q}".`} />
         )}
 
         {matchingTasks.length > 0 && (
-          <div
-            style={{
-              fontSize: 11.5,
-              fontWeight: 600,
-              letterSpacing: '0.06em',
-              textTransform: 'uppercase',
-              color: 'var(--text-3)',
-              marginBottom: 8,
-            }}
-          >
-            Tareas
-          </div>
+          <div style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-3)', marginBottom: 8 }}>Tareas</div>
         )}
-
         {matchingTasks.slice(0, 4).map((task) => (
-          <button
-            key={task.id}
-            onClick={() => {
-              onClose()
-              onOpenTask(task.id)
-            }}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 11,
-              width: '100%',
-              padding: '11px 6px',
-              background: 'none',
-              border: 'none',
-              borderBottom: '1px solid var(--border)',
-              cursor: 'pointer',
-              textAlign: 'left',
-            }}
-          >
+          <button key={task.id} onClick={() => { onClose(); onOpenTask(task.id) }}
+            style={{ display: 'flex', alignItems: 'center', gap: 11, width: '100%', padding: '11px 6px', background: 'none', border: 'none', borderBottom: '1px solid var(--border)', cursor: 'pointer', textAlign: 'left' }}>
             <Icon name="tasks" size={17} color="var(--text-3)" />
-            <span style={{ fontSize: 13.5, color: 'var(--text)' }}>
-              {task.title}
-            </span>
+            <div style={{ minWidth: 0 }}>
+              <span style={{ fontSize: 13.5, color: 'var(--text)', display: 'block' }}>{task.title}</span>
+              {task.dueDate && <span style={{ fontSize: 11.5, color: 'var(--text-3)' }}>Entrega: {task.dueDate}</span>}
+            </div>
           </button>
         ))}
 
         {matchingNotes.length > 0 && (
-          <div
-            style={{
-              fontSize: 11.5,
-              fontWeight: 600,
-              letterSpacing: '0.06em',
-              textTransform: 'uppercase',
-              color: 'var(--text-3)',
-              margin: '14px 0 8px',
-            }}
-          >
-            Notas
-          </div>
+          <div style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-3)', margin: '14px 0 8px' }}>Notas</div>
         )}
-
         {matchingNotes.slice(0, 4).map((note) => (
-          <button
-            key={note.id}
-            onClick={() => {
-              onClose()
-              go('notes')
-            }}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 11,
-              width: '100%',
-              padding: '11px 6px',
-              background: 'none',
-              border: 'none',
-              borderBottom: '1px solid var(--border)',
-              cursor: 'pointer',
-              textAlign: 'left',
-            }}
-          >
+          <button key={note.id} onClick={() => { onClose(); go('notes') }}
+            style={{ display: 'flex', alignItems: 'center', gap: 11, width: '100%', padding: '11px 6px', background: 'none', border: 'none', borderBottom: '1px solid var(--border)', cursor: 'pointer', textAlign: 'left' }}>
             <Icon name="notes" size={17} color="var(--text-3)" />
-            <span style={{ fontSize: 13.5, color: 'var(--text)' }}>
-              {note.title}
-            </span>
+            <span style={{ fontSize: 13.5, color: 'var(--text)' }}>{note.title}</span>
+          </button>
+        ))}
+
+        {matchingEvents.length > 0 && (
+          <div style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-3)', margin: '14px 0 8px' }}>Eventos</div>
+        )}
+        {matchingEvents.slice(0, 4).map((event) => (
+          <button key={event.id} onClick={() => { onClose(); go('calendar') }}
+            style={{ display: 'flex', alignItems: 'center', gap: 11, width: '100%', padding: '11px 6px', background: 'none', border: 'none', borderBottom: '1px solid var(--border)', cursor: 'pointer', textAlign: 'left' }}>
+            <Icon name="calendar" size={17} color="var(--text-3)" />
+            <div style={{ minWidth: 0 }}>
+              <span style={{ fontSize: 13.5, color: 'var(--text)', display: 'block' }}>{event.title}</span>
+              {event.date && <span style={{ fontSize: 11.5, color: 'var(--text-3)' }}>{event.date}</span>}
+            </div>
+          </button>
+        ))}
+
+        {matchingBlocks.length > 0 && (
+          <div style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-3)', margin: '14px 0 8px' }}>Clases</div>
+        )}
+        {matchingBlocks.slice(0, 4).map((block) => (
+          <button key={block.id} onClick={() => { onClose(); go('schedule') }}
+            style={{ display: 'flex', alignItems: 'center', gap: 11, width: '100%', padding: '11px 6px', background: 'none', border: 'none', borderBottom: '1px solid var(--border)', cursor: 'pointer', textAlign: 'left' }}>
+            <Icon name="clock" size={17} color="var(--text-3)" />
+            <div style={{ minWidth: 0 }}>
+              <span style={{ fontSize: 13.5, color: 'var(--text)', display: 'block' }}>{block.subjectData?.name || block.title}</span>
+              {block.room && <span style={{ fontSize: 11.5, color: 'var(--text-3)' }}>{block.room}</span>}
+            </div>
           </button>
         ))}
       </div>
@@ -473,80 +442,11 @@ function SearchSheet({ open, onClose, go, onOpenTask, tasks, notes }: SearchShee
 function NotifSheet({ open, onClose }: NotifSheetProps) {
   return (
     <Sheet open={open} onClose={onClose} title="Notificaciones">
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {DATA.notifications.map((notification) => (
-          <div
-            key={notification.id}
-            style={{
-              display: 'flex',
-              gap: 12,
-              padding: '13px',
-              borderRadius: 'var(--r-md)',
-              background: notification.unread
-                ? 'var(--primary-soft)'
-                : 'var(--surface-2)',
-              border: '1px solid var(--border)',
-            }}
-          >
-            <span
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: 'var(--r-sm)',
-                background: cSoftVar(notification.color),
-                color: cVar(notification.color),
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-              }}
-            >
-              <Icon name={notification.icon} size={17} />
-            </span>
-
-            <div style={{ flex: 1 }}>
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  gap: 8,
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: 13.5,
-                    fontWeight: 600,
-                    color: 'var(--text)',
-                  }}
-                >
-                  {notification.title}
-                </span>
-
-                <span
-                  style={{
-                    fontSize: 11,
-                    color: 'var(--text-3)',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {notification.time}
-                </span>
-              </div>
-
-              <div
-                style={{
-                  fontSize: 12.5,
-                  color: 'var(--text-2)',
-                  marginTop: 2,
-                  lineHeight: 1.45,
-                }}
-              >
-                {notification.body}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+      <EmptyState
+        icon="bell"
+        title="No tienes notificaciones"
+        body="Aquí verás avisos de entregas, clases próximas y sincronización."
+      />
     </Sheet>
   )
 }
@@ -734,23 +634,7 @@ export default function App() {
   const addCreatedClassToSchedule = async (item: any) => {
     if (item.type !== 'clase') return
 
-    const subjectColor =
-      item.subjectMode === 'new'
-        ? ((scheduleBlocks.length % 6) + 1)
-        : undefined
-
-    const subjectData =
-      item.subjectMode === 'new'
-        ? {
-          ...(item.subjectData || {}),
-          color: subjectColor,
-        }
-        : null
-
-    const subjectId =
-      item.subjectMode === 'new'
-        ? subjectData?.id
-        : item.subject
+    const subjectData = item.subjectData || null
 
     const blocks = (item.days || [])
       .map((day: string) => ({
@@ -758,7 +642,7 @@ export default function App() {
         day: DAY_INDEX[day],
         start: hourToNumber(item.startTime),
         end: hourToNumber(item.endTime),
-        subject: subjectId,
+        subject: subjectData?.id,
         title: item.title,
         room: item.room || item.location || 'Sin aula',
         location: item.location || '',
@@ -816,8 +700,8 @@ export default function App() {
     })
   }
 
-  const unread = DATA.notifications.filter((notification) => notification.unread)
-    .length
+  // No hay historial de notificaciones real todavía — sin backlog que mostrar como no leído.
+  const unread = 0
 
   const online = t.online
   const isError = route === 'offline' || route === 'notfound'
@@ -952,6 +836,7 @@ export default function App() {
             go={go}
             tasks={tasks}
             events={events}
+            scheduleBlocks={scheduleBlocks}
             onToggle={toggleTask}
             onOpenTask={openTask}
             variant={t.homeVariant}
@@ -960,9 +845,18 @@ export default function App() {
     }
   }
 
+  // authUser solo es null antes de autenticarse, rama en la que este valor nunca se usa (ver !isAuthenticated abajo).
   const displayUser = authUser
-    ? { ...DATA.user, name: authUser.name, email: authUser.email, initials: authUser.initials ?? authUser.name.slice(0, 2).toUpperCase(), program: authUser.program ?? DATA.user.program, short: authUser.name.split(' ')[0], photo: localStorage.getItem('uptgo_user_avatar') }
-    : DATA.user
+    ? {
+        name: authUser.name,
+        email: authUser.email,
+        initials: authUser.initials ?? authUser.name.slice(0, 2).toUpperCase(),
+        program: authUser.program ?? null,
+        semester: authUser.semester ?? null,
+        short: authUser.name.split(' ')[0],
+        photo: localStorage.getItem('uptgo_user_avatar'),
+      }
+    : { name: '', email: '', initials: '', program: null, semester: null, short: '', photo: null }
 
   const appInner = !isAuthenticated ? (
     <Login onLogin={handleLoginSuccess} />
@@ -1049,6 +943,8 @@ export default function App() {
           onOpenTask={openTask}
           tasks={tasks}
           notes={notes}
+          events={events}
+          scheduleBlocks={scheduleBlocks}
         />
 
         <NotifSheet
@@ -1104,6 +1000,9 @@ export default function App() {
         <CreateReminderModal
           open={reminderModalOpen}
           parent={reminderParent}
+          tasks={tasks}
+          events={events}
+          scheduleBlocks={scheduleBlocks}
           onClose={() => {
             setReminderModalOpen(false)
             setReminderParent(null)

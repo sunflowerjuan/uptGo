@@ -2,7 +2,7 @@ import React from 'react'
 import { Icon } from './Icons'
 import { Logo } from './Logo'
 import { Avatar, IconButton, Sheet } from './UI'
-import { DATA } from '../data/data'
+import { useData } from '../contexts/DataContext'
 
 type NavItem = {
   id: string
@@ -19,8 +19,8 @@ type User = {
   initials: string
   short: string
   name: string
-  program: string
-  semester?: string
+  program: string | null
+  semester?: string | null
   photo?: string | null
 }
 
@@ -530,22 +530,23 @@ export function TopBar({
   collapsed = false,
 }: TopBarProps) {
   const title = navItem(route)?.label || 'UPTGO'
+  const { tasks, notes } = useData()
   const [searchQ, setSearchQ] = React.useState('')
   const [searchFocused, setSearchFocused] = React.useState(false)
   const searchRef = React.useRef<HTMLDivElement | null>(null)
 
-  // Build inline search results from DATA (no limit — shown in scrollable dropdown)
+  // Búsqueda inline sobre las tareas/notas reales (no limit — shown in scrollable dropdown)
   const searchResults: SearchResult[] = React.useMemo(() => {
     if (!searchQ.trim() || searchQ.length < 2) return []
     const q = searchQ.toLowerCase()
-    const tasks = (DATA.tasks as { id: string | number; title: string }[])
+    const taskResults = tasks
       .filter((t) => t.title.toLowerCase().includes(q))
       .map((t): SearchResult => ({ id: t.id, title: t.title, kind: 'task' }))
-    const notes = (DATA.notes as { id: string | number; title: string }[])
+    const noteResults = notes
       .filter((n) => n.title.toLowerCase().includes(q))
       .map((n): SearchResult => ({ id: n.id, title: n.title, kind: 'note' }))
-    return [...tasks, ...notes]
-  }, [searchQ])
+    return [...taskResults, ...noteResults]
+  }, [notes, searchQ, tasks])
 
   const showDropdown = searchFocused && searchQ.length >= 2
 
