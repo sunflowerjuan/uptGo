@@ -1,5 +1,5 @@
 import React from 'react'
-import { DATA } from '../data/data'
+import { useData } from '../contexts/DataContext'
 import { CreateAcademicItemModal, type CreateItemType, } from '../components/CreateAcademicItemModal'
 import { Button, Card, EmptyState, FadeIn, IconButton, Pill, SectionTitle, cSoftVar, cVar, subjectById, } from '../components/UI'
 import { Icon } from '../components/Icons'
@@ -343,18 +343,6 @@ const MONTHS = [
   'diciembre',
 ]
 
-const DAY_MARKS: Record<number, number[]> = {
-  8: [1, 2, 3, 4],
-  10: [3],
-  12: [4],
-  14: [2, 2],
-  15: [6],
-  18: [1],
-  20: [2, 3],
-  22: [5],
-  27: [1, 4],
-}
-
 export function Calendar({ m, onAdd, events = [], onCreated }: AnyProps) {
   const [view, setView] = React.useState<'mes' | 'agenda'>('mes')
   const [sel, setSel] = React.useState(8)
@@ -371,6 +359,7 @@ export function Calendar({ m, onAdd, events = [], onCreated }: AnyProps) {
   const first = new Date(year, month, 1)
   const startDow = (first.getDay() + 6) % 7
   const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const isMockMonth = year === 2026 && month === 4
 
   const cells: Array<number | null> = [
     ...Array(startDow).fill(null),
@@ -1205,6 +1194,7 @@ export function Calendar({ m, onAdd, events = [], onCreated }: AnyProps) {
 }
 
 export function Schedule({ m, onAdd, toast, scheduleItems = [], onImportSchedule }: AnyProps) {
+  const { subjects } = useData()
   const days = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
   const hours = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
   const rowH = m ? 44 : 52
@@ -1217,15 +1207,6 @@ export function Schedule({ m, onAdd, toast, scheduleItems = [], onImportSchedule
   const gridWidth = m ? '100%' : 1120
 
   const fullSchedule = [...scheduleItems]
-
-  const createdSubjects = scheduleItems
-    .filter((block: any) => block.subjectData)
-    .map((block: any) => block.subjectData)
-
-  const uniqueCreatedSubjects = createdSubjects.filter(
-    (subject: any, index: number, arr: any[]) =>
-      arr.findIndex((item) => item.id === subject.id) === index,
-  )
 
   const getSubject = (block: any) => {
     if (block.subjectData) {
@@ -1355,7 +1336,7 @@ export function Schedule({ m, onAdd, toast, scheduleItems = [], onImportSchedule
             minWidth: 0,
           }}
         >
-          {uniqueCreatedSubjects.map((subject: any) => (
+          {subjects.map((subject) => (
             <span
               key={subject.id}
               style={{
@@ -1378,36 +1359,6 @@ export function Schedule({ m, onAdd, toast, scheduleItems = [], onImportSchedule
                   height: 6,
                   borderRadius: '50%',
                   background: cVar(subject.color || 1),
-                  flexShrink: 0,
-                }}
-              />
-              {subject.name}
-            </span>
-          ))}
-
-          {DATA.subjects.map((subject: any) => (
-            <span
-              key={subject.id}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 5,
-                maxWidth: '100%',
-                padding: '5px 9px',
-                borderRadius: 'var(--r-full)',
-                background: cSoftVar(subject.color),
-                color: cVar(subject.color),
-                fontSize: 11,
-                fontWeight: 700,
-                whiteSpace: 'nowrap',
-              }}
-            >
-              <span
-                style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: '50%',
-                  background: cVar(subject.color),
                   flexShrink: 0,
                 }}
               />

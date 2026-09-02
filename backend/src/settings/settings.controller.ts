@@ -1,4 +1,12 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Patch, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Patch,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOkResponse,
@@ -7,8 +15,8 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import type { User } from '@prisma/client';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { SettingsResponseDto } from './dto/settings-response.dto';
 import { UpdateSettingsDto } from './dto/update-settings.dto';
 import { SettingsService } from './settings.service';
@@ -27,7 +35,9 @@ export class SettingsController {
       'Devuelve las preferencias del usuario autenticado. Si no existen, las crea con valores predeterminados.',
   })
   @ApiOkResponse({ type: SettingsResponseDto })
-  @ApiUnauthorizedResponse({ description: 'Token ausente, inválido o expirado' })
+  @ApiUnauthorizedResponse({
+    description: 'Token ausente, inválido o expirado',
+  })
   findMine(@CurrentUser() user: User): Promise<SettingsResponseDto> {
     return this.settingsService.findByUser(user.id);
   }
@@ -41,7 +51,9 @@ export class SettingsController {
       'En notificationPreferences, solo se sobrescriben las claves enviadas.',
   })
   @ApiOkResponse({ type: SettingsResponseDto })
-  @ApiUnauthorizedResponse({ description: 'Token ausente, inválido o expirado' })
+  @ApiUnauthorizedResponse({
+    description: 'Token ausente, inválido o expirado',
+  })
   update(
     @CurrentUser() user: User,
     @Body() dto: UpdateSettingsDto,

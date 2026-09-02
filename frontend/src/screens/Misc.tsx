@@ -1,18 +1,30 @@
 import React, { useState } from 'react'
-import { DATA } from '../data/data'
 import { GoogleCampusMap, type CampusPlace } from '../components/GoogleCampusMap'
 import { Icon } from '../components/Icons'
 import { Avatar, Button, Card, FadeIn, SectionTitle, Sheet } from '../components/UI'
 import { useAuth } from '../contexts/AuthContext'
+import { useSyncContext } from '../contexts/SyncContext'
 import { ApiError } from '../services/api'
+import { listBackups, downloadAndImportBackup } from '../services/sync.service'
+import type { DriveBackup } from '../services/sync.service'
+import {
+  isPushSubscribed,
+  isPushSupported,
+  subscribeToPush,
+  unsubscribeFromPush,
+  getNotificationPreferences,
+  updateNotificationPreferences,
+  sendTestNotification,
+  PushNetworkError,
+} from '../services/push.service'
 
 type AnyProps = Record<string, any>
 
 const CAMPUS_PLACES: CampusPlace[] = [
   {
-    id: 'aula-204',
-    title: 'Aula 204 · Bloque C',
-    subtitle: 'Bases de Datos',
+    id: 'bloques',
+    title: 'Bloques de aulas',
+    subtitle: 'Salones de clase',
     query: 'Universidad Pedagógica y Tecnológica de Colombia Tunja Bloque C',
   },
   {
@@ -93,12 +105,20 @@ export function CampusMap({ m }: any) {
   )
 }
 
-function ToggleSwitch({ on, onChange }: AnyProps) {
+function ToggleSwitch({ on, onChange, disabled }: AnyProps) {
   return (
-    <button onClick={() => onChange(!on)} style={{
-      width: 44, height: 26, borderRadius: 'var(--r-full)', border: 'none', cursor: 'pointer', position: 'relative', flexShrink: 0,
-      background: on ? 'var(--primary)' : 'var(--border-strong)', transition: 'background .2s',
-    }}>
+    <button
+      onClick={() => !disabled && onChange(!on)}
+      disabled={disabled}
+      style={{
+        width: 44, height: 26, borderRadius: 'var(--r-full)', border: 'none',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        position: 'relative', flexShrink: 0,
+        background: on ? 'var(--primary)' : 'var(--border-strong)',
+        transition: 'background .2s',
+        opacity: disabled ? 0.5 : 1,
+      }}
+    >
       <span style={{ position: 'absolute', top: 3, left: on ? 21 : 3, width: 20, height: 20, borderRadius: '50%', background: 'var(--surface)', transition: 'left .2s var(--ease)', boxShadow: 'var(--shadow-sm)' }} />
     </button>
   )
@@ -235,11 +255,155 @@ function EditProfileSheet({ open, onClose, toast }: { open: boolean; onClose: ()
   )
 }
 
+function formatRelativeTime(isoString: string | null): string {
+  if (!isoString) return 'Nunca'
+  const diff = Date.now() - new Date(isoString).getTime()
+  const mins = Math.floor(diff / 60_000)
+  if (mins < 1) return 'Hace un momento'
+  if (mins < 60) return `Hace ${mins} min`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `Hace ${hrs} h`
+  return `Hace ${Math.floor(hrs / 24)} días`
+}
+
+function formatBackupDate(isoString: string | null): string {
+  if (!isoString) return '—'
+  return new Date(isoString).toLocaleString('es-CO', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function formatBackupSize(sizeStr: string | null): string {
+  if (!sizeStr) return '—'
+  const bytes = parseInt(sizeStr, 10)
+  if (Number.isNaN(bytes)) return '—'
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function RestoreBackupSheet({ open, onClose, toast }: { open: boolean; onClose: () => void; toast: (msg: string) => void }) {
+  const [backups, setBackups] = React.useState<DriveBackup[]>([])
+  const [loadingList, setLoadingList] = React.useState(false)
+  const [restoring, setRestoring] = React.useState<string | null>(null)
+  const [confirmFileId, setConfirmFileId] = React.useState<string | null>(null)
+  const [error, setError] = React.useState('')
+
+  React.useEffect(() => {
+    if (!open) return
+    setLoadingList(true)
+    setError('')
+    listBackups()
+      .then(setBackups)
+      .catch(() => setError('No se pudo cargar la lista de backups. Verifica tu conexión a Google Drive.'))
+      .finally(() => setLoadingList(false))
+  }, [open])
+
+  const handleRestore = async (fileId: string) => {
+    setRestoring(fileId)
+    setConfirmFileId(null)
+    try {
+      await downloadAndImportBackup(fileId)
+      toast('Backup restaurado. Recargando…')
+      setTimeout(() => window.location.reload(), 1500)
+    } catch {
+      toast('Error al restaurar el backup. Intenta de nuevo.')
+    } finally {
+      setRestoring(null)
+    }
+  }
+
+  return (
+    <Sheet open={open} onClose={onClose} title="Restaurar backup">
+      {error && (
+        <div style={{ padding: '12px 14px', borderRadius: 'var(--r-sm)', background: 'oklch(0.97 0.02 15)', border: '1px solid oklch(0.82 0.08 15)', color: 'oklch(0.45 0.15 15)', fontSize: 13, marginBottom: 14 }}>
+          {error}
+        </div>
+      )}
+
+      {loadingList && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--text-3)', fontSize: 13, padding: '20px 0' }}>
+          <Icon name="cloudCheck" size={16} color="var(--text-3)" />
+          Cargando backups de Google Drive…
+        </div>
+      )}
+
+      {!loadingList && !error && backups.length === 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '24px 0', color: 'var(--text-3)' }}>
+          <Icon name="cloudCheck" size={36} color="var(--text-3)" />
+          <p style={{ margin: 0, fontSize: 13.5, textAlign: 'center' }}>No hay backups disponibles en Google Drive. Sincroniza primero desde la sección de almacenamiento.</p>
+        </div>
+      )}
+
+      {confirmFileId && (
+        <div style={{ padding: '14px', borderRadius: 'var(--r-sm)', background: 'var(--warn-soft)', border: '1px solid var(--warn)', marginBottom: 12 }}>
+          <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--text)', lineHeight: 1.5 }}>
+            ¿Restaurar este backup? <strong>Los datos locales actuales serán reemplazados.</strong> Esta acción no se puede deshacer.
+          </p>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Button variant="ghost" size="sm" onClick={() => setConfirmFileId(null)}>Cancelar</Button>
+            <Button variant="primary" size="sm" onClick={() => handleRestore(confirmFileId)}>
+              Sí, restaurar
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+        {backups.map((backup) => (
+          <div key={backup.fileId} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 14px', borderRadius: 'var(--r-sm)', border: '1px solid var(--border)', background: 'var(--surface-2)' }}>
+            <span style={{ width: 36, height: 36, borderRadius: 'var(--r-sm)', background: 'var(--surface)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Icon name="cloudCheck" size={17} color="var(--primary)" />
+            </span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{backup.name}</div>
+              <div style={{ fontSize: 11.5, color: 'var(--text-3)', marginTop: 2 }}>
+                {formatBackupDate(backup.modifiedAt)} · {formatBackupSize(backup.size)}
+              </div>
+            </div>
+            <Button
+              variant="soft"
+              size="sm"
+              disabled={restoring === backup.fileId}
+              onClick={() => setConfirmFileId(backup.fileId)}
+            >
+              {restoring === backup.fileId ? 'Restaurando…' : 'Restaurar'}
+            </Button>
+          </div>
+        ))}
+      </div>
+    </Sheet>
+  )
+}
+
+type NotifPrefs = { vencimiento: boolean; clase: boolean; recordatorio: boolean; sync: boolean }
+
+const DEFAULT_NOTIF: NotifPrefs = { vencimiento: true, clase: true, recordatorio: true, sync: false }
+
 export function Settings({ m, theme, onTheme, palette, onPalette, onLogout, toast }: AnyProps) {
   const { user, registerWebAuthn } = useAuth()
-  const [notif, setNotif] = React.useState<Record<string, boolean>>({ vencimiento: true, clase: true, recordatorio: true, sync: false })
+  const { syncStatus, lastSyncAt, syncVersion, syncNow } = useSyncContext()
+  const [notif, setNotif] = React.useState<NotifPrefs>(DEFAULT_NOTIF)
+  const [pushSubscribed, setPushSubscribed] = React.useState(false)
+  const [pushTogglingKey, setPushTogglingKey] = React.useState<string | null>(null)
+  const [pushError, setPushError] = React.useState('')
+  const [pushNetworkBlocked, setPushNetworkBlocked] = React.useState(false)
   const [lang, setLang] = React.useState('es')
   const [editOpen, setEditOpen] = React.useState(false)
+  const [restoreOpen, setRestoreOpen] = React.useState(false)
+
+  // Load notification preferences from backend + browser push state
+  React.useEffect(() => {
+    if (!user) return
+    void getNotificationPreferences()
+      .then((prefs) => setNotif(prefs))
+      .catch(() => {/* backend offline — use defaults */})
+    void isPushSubscribed().then(setPushSubscribed)
+  }, [user])
 
   const bioKey = user ? WEBAUTHN_KEY(user.id) : null
   const [bioState, setBioState] = React.useState<'idle' | 'registering' | 'ok' | 'error'>(() =>
@@ -257,10 +421,10 @@ export function Settings({ m, theme, onTheme, palette, onPalette, onLogout, toas
     arcilla: 'oklch(0.58 0.135 45)',
   }
 
-  const displayName = user?.name ?? DATA.user.name
-  const displayEmail = user?.email ?? DATA.user.email
+  const displayName = user?.name ?? ''
+  const displayEmail = user?.email ?? ''
   const displayProgram = user?.program ?? null
-  const displayInitials = user?.initials ?? (user?.name ? user.name.slice(0, 2).toUpperCase() : DATA.user.initials)
+  const displayInitials = user?.initials ?? (user?.name ? user.name.slice(0, 2).toUpperCase() : '')
 
   const handleAvatarFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -421,16 +585,131 @@ export function Settings({ m, theme, onTheme, palette, onPalette, onLogout, toas
       <FadeIn delay={200}>
         <Card pad={m ? 16 : 20}>
           <SectionTitle>Notificaciones</SectionTitle>
+
+          {!isPushSupported() && (
+            <div style={{ padding: '10px 13px', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', border: '1px solid var(--border)', fontSize: 12.5, color: 'var(--text-3)', marginBottom: 12 }}>
+              Tu navegador no soporta notificaciones push.
+            </div>
+          )}
+
+          {pushNetworkBlocked && (
+            <div style={{ padding: '10px 13px', borderRadius: 'var(--r-sm)', background: 'oklch(0.97 0.06 85)', border: '1px solid oklch(0.85 0.1 85)', color: 'oklch(0.45 0.12 60)', fontSize: 12.5, marginBottom: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+                  <Icon name="bell" size={14} color="oklch(0.55 0.12 60)" />
+                  <div>
+                    <div style={{ fontWeight: 600, marginBottom: 2 }}>Preferencia guardada — push pendiente</div>
+                    <div style={{ marginBottom: 8 }}>El servicio push de Chrome no está disponible en esta red. Conéctate desde otra red (p. ej. datos móviles) y presiona Reintentar.</div>
+                    <button
+                      onClick={async () => {
+                        if (!user) return
+                        try {
+                          await subscribeToPush(user.id)
+                          setPushSubscribed(true)
+                          setPushNetworkBlocked(false)
+                          toast('Dispositivo registrado para push')
+                        } catch (err) {
+                          if (!(err instanceof PushNetworkError)) {
+                            const msg = err instanceof Error ? err.message : 'Error'
+                            setPushError(msg)
+                            setPushNetworkBlocked(false)
+                          }
+                        }
+                      }}
+                      style={{ fontSize: 12, fontWeight: 600, padding: '4px 10px', borderRadius: 'var(--r-full)', background: 'oklch(0.55 0.12 60)', color: '#fff', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-ui)' }}
+                    >
+                      Reintentar
+                    </button>
+                  </div>
+                </div>
+                <button onClick={() => setPushNetworkBlocked(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', flexShrink: 0, fontSize: 14 }}>✕</button>
+              </div>
+            </div>
+          )}
+
+          {pushError && (
+            <div style={{ padding: '10px 13px', borderRadius: 'var(--r-sm)', background: 'oklch(0.97 0.02 15)', border: '1px solid oklch(0.82 0.08 15)', color: 'oklch(0.45 0.15 15)', fontSize: 13, marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+              <span>{pushError}</span>
+              <button onClick={() => setPushError('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', flexShrink: 0 }}>✕</button>
+            </div>
+          )}
+
           {[
-            ['vencimiento', 'flag', 'Vencimiento de tareas'],
-            ['clase', 'clock', 'Inicio de clases'],
-            ['recordatorio', 'bell', 'Recordatorios personales'],
-            ['sync', 'cloudCheck', 'Sincronización completada'],
-          ].map(([k, ic, label], i, arr) => (
-            <SettingRow key={k} icon={ic} title={label} last={i === arr.length - 1}>
-              <ToggleSwitch on={notif[k]} onChange={(v: boolean) => setNotif((s) => ({ ...s, [k]: v }))} />
-            </SettingRow>
-          ))}
+            ['vencimiento', 'flag', 'Vencimiento de tareas', 'Recordatorios de entrega'],
+            ['clase', 'clock', 'Inicio de clases', 'Aviso 5 min antes de cada clase'],
+            ['recordatorio', 'bell', 'Recordatorios personales', 'Alertas que creaste tú'],
+            ['sync', 'cloudCheck', 'Sincronización completada', 'Al terminar un backup de Drive'],
+          ].map(([k, ic, label, sub], i, arr) => {
+            const key = k as keyof NotifPrefs
+            const isToggling = pushTogglingKey === key
+            return (
+              <SettingRow key={k} icon={ic} title={label} sub={sub} last={i === arr.length - 1}>
+                <ToggleSwitch
+                  on={notif[key]}
+                  onChange={async (next: boolean) => {
+                    if (!isPushSupported()) {
+                      toast('Tu navegador no soporta notificaciones push')
+                      return
+                    }
+                    setPushError('')
+                    setPushNetworkBlocked(false)
+                    setPushTogglingKey(key)
+
+                    const newPrefs: NotifPrefs = { ...notif, [key]: next }
+
+                    try {
+                      // 1. Guardar preferencia en backend (siempre, independiente del push)
+                      await updateNotificationPreferences(newPrefs)
+                      setNotif(newPrefs)
+
+                      const anyEnabled = Object.values(newPrefs).some(Boolean)
+
+                      // 2. Gestionar suscripción push del dispositivo
+                      if (next && !pushSubscribed) {
+                        try {
+                          await subscribeToPush(user?.id ?? 'anon')
+                          setPushSubscribed(true)
+                          toast('Notificaciones activadas')
+                        } catch (subErr) {
+                          if (subErr instanceof PushNetworkError) {
+                            // FCM bloqueado — preferencia guardada, push pendiente
+                            setPushNetworkBlocked(true)
+                          } else {
+                            throw subErr // error real: permisos denegados, etc.
+                          }
+                        }
+                      } else if (!anyEnabled && pushSubscribed) {
+                        await unsubscribeFromPush(user?.id ?? 'anon')
+                        setPushSubscribed(false)
+                        toast('Notificaciones desactivadas')
+                      } else if (next) {
+                        toast(`${label} activado`)
+                      }
+                    } catch (err) {
+                      const msg = err instanceof Error ? err.message : 'Error al configurar notificaciones'
+                      setPushError(msg)
+                      setNotif((s) => ({ ...s, [key]: !next }))
+                    } finally {
+                      setPushTogglingKey(null)
+                    }
+                  }}
+                  disabled={isToggling}
+                />
+              </SettingRow>
+            )
+          })}
+
+          {isPushSupported() && pushSubscribed && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 12, marginTop: 4, borderTop: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, color: 'var(--ok)' }}>
+                <Icon name="check" size={14} color="var(--ok)" />
+                Dispositivo registrado para push
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => void sendTestNotification('recordatorio').then(() => toast('Notificación de prueba enviada')).catch(() => toast('Error al enviar prueba'))}>
+                Probar
+              </Button>
+            </div>
+          )}
         </Card>
       </FadeIn>
 
@@ -449,19 +728,73 @@ export function Settings({ m, theme, onTheme, palette, onPalette, onLogout, toas
             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)', fontFamily: 'var(--font-display)' }}>25 / 5 min</span>
           </SettingRow>
 
-          <SettingRow icon="download" title="Almacenamiento local" sub="14.2 MB usados · datos offline" last>
-            <Button variant="ghost" size="sm" onClick={() => toast('Caché limpiada')}>Limpiar</Button>
+          <SettingRow icon="download" title="Almacenamiento local" sub="Datos offline almacenados en este dispositivo" last>
+            <Button variant="ghost" size="sm" onClick={() => toast('Caché de red limpiada')}>Limpiar caché</Button>
           </SettingRow>
         </Card>
       </FadeIn>
 
-      <FadeIn delay={300}>
+      <FadeIn delay={270}>
+        <Card pad={m ? 16 : 20}>
+          <SectionTitle>Sincronización con Drive</SectionTitle>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+              <div>
+                <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Último backup</div>
+                <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)', marginTop: 3 }}>
+                  {formatRelativeTime(lastSyncAt)}
+                </div>
+              </div>
+              {syncVersion > 0 && (
+                <div>
+                  <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Versión</div>
+                  <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)', marginTop: 3 }}>#{syncVersion}</div>
+                </div>
+              )}
+            </div>
+
+            {syncStatus === 'error' && (
+              <div style={{ padding: '10px 14px', borderRadius: 'var(--r-sm)', background: 'oklch(0.97 0.02 15)', border: '1px solid oklch(0.82 0.08 15)', color: 'oklch(0.45 0.15 15)', fontSize: 13 }}>
+                Error al sincronizar. Verifica tu conexión y que hayas iniciado sesión con Google.
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 9, flexWrap: 'wrap' }}>
+              <Button
+                variant="primary"
+                icon={syncStatus === 'syncing' ? 'refresh' : 'cloudCheck'}
+                disabled={syncStatus === 'syncing'}
+                onClick={() => void syncNow().then(() => toast('Backup completado en Google Drive'))}
+              >
+                {syncStatus === 'syncing' ? 'Sincronizando…' : 'Sincronizar ahora'}
+              </Button>
+
+              <Button
+                variant="outline"
+                icon="download"
+                disabled={syncStatus === 'syncing'}
+                onClick={() => setRestoreOpen(true)}
+              >
+                Restaurar backup
+              </Button>
+            </div>
+
+            <p style={{ margin: 0, fontSize: 12, color: 'var(--text-3)', lineHeight: 1.5 }}>
+              Los datos se respaldan en tu Google Drive. Los adjuntos (imágenes, audio, PDFs) también se sincronizan automáticamente al reconectar.
+            </p>
+          </div>
+        </Card>
+      </FadeIn>
+
+      <FadeIn delay={320}>
         <Button variant="danger" icon="logout" full onClick={onLogout}>Cerrar sesión</Button>
       </FadeIn>
 
       <div style={{ textAlign: 'center', fontSize: 11.5, color: 'var(--text-3)', paddingBottom: 4 }}>UPTGO · versión 1.0 · PWA</div>
 
       <EditProfileSheet open={editOpen} onClose={() => setEditOpen(false)} toast={toast} />
+      <RestoreBackupSheet open={restoreOpen} onClose={() => setRestoreOpen(false)} toast={toast} />
     </div>
   )
 }

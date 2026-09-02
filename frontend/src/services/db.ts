@@ -39,6 +39,15 @@ export type EventRecord = DbRecord & {
   color?: string | number
 }
 
+export type SubjectData = {
+  id: string
+  name: string
+  code?: string
+  teacher?: string
+  room?: string
+  color: number
+}
+
 export type ScheduleBlockRecord = DbRecord & {
   day: number
   start: number
@@ -46,6 +55,11 @@ export type ScheduleBlockRecord = DbRecord & {
   subject?: string
   title?: string
   room?: string
+  location?: string
+  locationUrl?: string
+  teacher?: string
+  created?: boolean
+  subjectData?: SubjectData | null
 }
 
 type StoreName = 'tasks' | 'notes' | 'reminders' | 'events' | 'scheduleBlocks'
