@@ -1,5 +1,6 @@
 import React from 'react'
-import { DATA } from '../data/data'
+import { useData } from '../contexts/DataContext'
+import { nextSubjectColor } from '../services/subjects'
 import { Button } from './UI'
 import { Icon } from './Icons'
 
@@ -64,12 +65,6 @@ const DEFAULT_FORM = {
 }
 
 type FormState = typeof DEFAULT_FORM
-
-function saveLocalItem(item: AnyProps) {
-    const key = 'uptgo_created_items'
-    const current = JSON.parse(localStorage.getItem(key) || '[]') as AnyProps[]
-    localStorage.setItem(key, JSON.stringify([item, ...current]))
-}
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
     return (
@@ -434,6 +429,8 @@ export function CreateAcademicItemModal({
     onClose,
     onCreated,
 }: CreateAcademicItemModalProps) {
+    const { subjects } = useData()
+    const hasExistingSubjects = subjects.length > 0
     const [form, setForm] = React.useState<FormState>(DEFAULT_FORM)
     const [error, setError] = React.useState('')
     const [_audioBlob, setAudioBlob] = React.useState<Blob | null>(null)
@@ -464,6 +461,8 @@ export function CreateAcademicItemModal({
             [key]: value,
         }))
     }
+    // Sin materias creadas todavía no hay nada que listar como "existente".
+    const effectiveSubjectMode = hasExistingSubjects ? form.subjectMode : 'new'
     const buildGoogleMapsSearchUrl = (query: string) => {
         return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
     }
@@ -500,11 +499,11 @@ export function CreateAcademicItemModal({
         }
 
         if (type === 'clase') {
-            if (form.subjectMode === 'existing' && !form.subject) {
+            if (effectiveSubjectMode === 'existing' && !form.subject) {
                 return 'Selecciona una materia o crea una nueva.'
             }
 
-            if (form.subjectMode === 'new') {
+            if (effectiveSubjectMode === 'new') {
                 if (!form.newSubjectName.trim()) {
                     return 'El nombre de la materia es obligatorio.'
                 }
@@ -547,20 +546,22 @@ export function CreateAcademicItemModal({
             : ''
 
         const resolvedSubject =
-            type === 'clase' && form.subjectMode === 'new'
-                ? {
-                    id: `subject-${Date.now()}`,
-                    name: form.newSubjectName.trim(),
-                    code: form.newSubjectCode.trim(),
-                    teacher: form.newSubjectTeacher.trim(),
-                }
+            type === 'clase'
+                ? effectiveSubjectMode === 'new'
+                    ? {
+                        id: `subject-${Date.now()}`,
+                        name: form.newSubjectName.trim(),
+                        code: form.newSubjectCode.trim(),
+                        teacher: form.newSubjectTeacher.trim(),
+                        room: form.room.trim() || undefined,
+                        color: nextSubjectColor(subjects),
+                    }
+                    : subjects.find((subject) => subject.id === form.subject) ?? null
                 : null
 
         const resolvedTitle =
             type === 'clase'
-                ? form.subjectMode === 'new'
-                    ? form.newSubjectName.trim()
-                    : DATA.subjects.find((subject: AnyProps) => subject.id === form.subject)?.name || ''
+                ? resolvedSubject?.name || ''
                 : form.title.trim()
 
         const { title, location, locationUrl, ...formWithoutDuplicatedFields } = form
@@ -601,7 +602,6 @@ export function CreateAcademicItemModal({
             }
         }
 
-        saveLocalItem(item)
         onCreated?.(item)
         onClose()
     }
@@ -1037,7 +1037,7 @@ export function CreateAcademicItemModal({
                                 style={inputStyle()}
                             >
                                 <option value="">Sin materia</option>
-                                {DATA.subjects.map((subject: AnyProps) => (
+                                {subjects.map((subject) => (
                                     <option key={subject.id} value={subject.id}>
                                         {subject.name}
                                     </option>
@@ -1174,44 +1174,46 @@ export function CreateAcademicItemModal({
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                                 <FieldLabel>Materia</FieldLabel>
 
-                                <div
-                                    style={{
-                                        display: 'flex',
-                                        gap: 6,
-                                        background: 'var(--surface-2)',
-                                        borderRadius: 'var(--r-full)',
-                                        padding: 3,
-                                        width: 'fit-content',
-                                        maxWidth: '100%',
-                                    }}
-                                >
-                                    {[
-                                        ['existing', 'Existente'],
-                                        ['new', 'Nueva'],
-                                    ].map(([id, label]) => (
-                                        <button
-                                            key={id}
-                                            type="button"
-                                            onClick={() => update('subjectMode', id)}
-                                            style={{
-                                                padding: '7px 14px',
-                                                borderRadius: 'var(--r-full)',
-                                                border: 'none',
-                                                cursor: 'pointer',
-                                                background: form.subjectMode === id ? 'var(--surface)' : 'transparent',
-                                                boxShadow: form.subjectMode === id ? 'var(--shadow-sm)' : 'none',
-                                                color: form.subjectMode === id ? 'var(--text)' : 'var(--text-2)',
-                                                fontFamily: 'var(--font-ui)',
-                                                fontSize: 12.5,
-                                                fontWeight: 700,
-                                            }}
-                                        >
-                                            {label}
-                                        </button>
-                                    ))}
-                                </div>
+                                {hasExistingSubjects && (
+                                    <div
+                                        style={{
+                                            display: 'flex',
+                                            gap: 6,
+                                            background: 'var(--surface-2)',
+                                            borderRadius: 'var(--r-full)',
+                                            padding: 3,
+                                            width: 'fit-content',
+                                            maxWidth: '100%',
+                                        }}
+                                    >
+                                        {[
+                                            ['existing', 'Existente'],
+                                            ['new', 'Nueva'],
+                                        ].map(([id, label]) => (
+                                            <button
+                                                key={id}
+                                                type="button"
+                                                onClick={() => update('subjectMode', id)}
+                                                style={{
+                                                    padding: '7px 14px',
+                                                    borderRadius: 'var(--r-full)',
+                                                    border: 'none',
+                                                    cursor: 'pointer',
+                                                    background: effectiveSubjectMode === id ? 'var(--surface)' : 'transparent',
+                                                    boxShadow: effectiveSubjectMode === id ? 'var(--shadow-sm)' : 'none',
+                                                    color: effectiveSubjectMode === id ? 'var(--text)' : 'var(--text-2)',
+                                                    fontFamily: 'var(--font-ui)',
+                                                    fontSize: 12.5,
+                                                    fontWeight: 700,
+                                                }}
+                                            >
+                                                {label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
 
-                                {form.subjectMode === 'existing' && (
+                                {effectiveSubjectMode === 'existing' && (
                                     <Field label="Seleccionar materia">
                                         <select
                                             value={form.subject}
@@ -1219,7 +1221,7 @@ export function CreateAcademicItemModal({
                                             style={inputStyle()}
                                         >
                                             <option value="">Selecciona una materia</option>
-                                            {DATA.subjects.map((subject: AnyProps) => (
+                                            {subjects.map((subject) => (
                                                 <option key={subject.id} value={subject.id}>
                                                     {subject.name}
                                                 </option>
@@ -1228,7 +1230,7 @@ export function CreateAcademicItemModal({
                                     </Field>
                                 )}
 
-                                {form.subjectMode === 'new' && (
+                                {effectiveSubjectMode === 'new' && (
                                     <>
                                         <Field label="Nombre de la materia">
                                             <input

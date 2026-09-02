@@ -1,4 +1,12 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiConflictResponse,
@@ -29,7 +37,9 @@ export class SyncController {
       'Crea el registro con valores iniciales si aún no existe.',
   })
   @ApiOkResponse({ type: SyncResponseDto })
-  @ApiUnauthorizedResponse({ description: 'Token ausente, inválido o expirado' })
+  @ApiUnauthorizedResponse({
+    description: 'Token ausente, inválido o expirado',
+  })
   getSync(@CurrentUser() user: User): Promise<SyncResponseDto> {
     return this.syncService.getSync(user.id);
   }
@@ -44,7 +54,9 @@ export class SyncController {
   })
   @ApiOkResponse({ type: SyncResponseDto })
   @ApiConflictResponse({ description: 'Ya hay una sincronización en progreso' })
-  @ApiUnauthorizedResponse({ description: 'Token ausente, inválido o expirado' })
+  @ApiUnauthorizedResponse({
+    description: 'Token ausente, inválido o expirado',
+  })
   startSync(@CurrentUser() user: User): Promise<SyncResponseDto> {
     return this.syncService.startSync(user.id);
   }
@@ -58,7 +70,9 @@ export class SyncController {
       'Envía una notificación push al usuario si tiene activado el tipo "sync" en preferencias.',
   })
   @ApiOkResponse({ type: SyncResponseDto })
-  @ApiUnauthorizedResponse({ description: 'Token ausente, inválido o expirado' })
+  @ApiUnauthorizedResponse({
+    description: 'Token ausente, inválido o expirado',
+  })
   completeSync(
     @CurrentUser() user: User,
     @Body() dto: SyncCompleteDto,
@@ -75,7 +89,9 @@ export class SyncController {
       'de backup a Google Drive falla. Se puede reintentar llamando a POST /api/sync/start.',
   })
   @ApiOkResponse({ type: SyncResponseDto })
-  @ApiUnauthorizedResponse({ description: 'Token ausente, inválido o expirado' })
+  @ApiUnauthorizedResponse({
+    description: 'Token ausente, inválido o expirado',
+  })
   failSync(@CurrentUser() user: User): Promise<SyncResponseDto> {
     return this.syncService.failSync(user.id);
   }

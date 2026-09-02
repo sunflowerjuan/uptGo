@@ -1,5 +1,5 @@
 import React from 'react'
-import { DATA } from '../data/data'
+import { useData } from '../contexts/DataContext'
 import { Icon } from '../components/Icons'
 import {
   Button,
@@ -208,6 +208,7 @@ function AdvancedFiltersSheet({
   filters: AdvancedFilters
   onApply: (f: AdvancedFilters) => void
 }) {
+  const { subjects } = useData()
   const [local, setLocal] = React.useState<AdvancedFilters>(filters)
 
   React.useEffect(() => {
@@ -248,7 +249,7 @@ function AdvancedFiltersSheet({
           </div>
           <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
             {pillBtn(local.subject === 'all', () => update('subject', 'all'), 'Todas')}
-            {DATA.subjects.map((s: AnyProps) => (
+            {subjects.map((s) => (
               <button
                 key={s.id}
                 type="button"
@@ -843,6 +844,7 @@ function AttachmentChip({
 }
 
 function EditTaskSheet({ task, onClose, onSave }: AnyProps) {
+  const { subjects } = useData()
   const [form, setForm] = React.useState({
     title: task.title || '',
     subject: task.subject || '',
@@ -898,7 +900,7 @@ function EditTaskSheet({ task, onClose, onSave }: AnyProps) {
           <label style={labelStyle}>Materia</label>
           <select style={selectStyle} value={form.subject} onChange={(e) => set('subject', e.target.value)}>
             <option value="">Sin materia</option>
-            {DATA.subjects.map((s) => (
+            {subjects.map((s) => (
               <option key={s.id} value={s.id}>{s.name}</option>
             ))}
           </select>

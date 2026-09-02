@@ -1,7 +1,7 @@
-import { DATA } from './data/data'
 import { useEffect, useRef, useState } from 'react'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 import { useAuth } from './contexts/AuthContext'
+import { useData } from './contexts/DataContext'
 import { Icon } from './components/Icons'
 import { Sheet, EmptyState, cSoftVar, cVar } from './components/UI'
 import { TopBar, Sidebar, BottomNav, MenuSheet } from './components/Nav'
@@ -60,6 +60,10 @@ type SearchSheetProps = {
   onClose: () => void
   go: (route: string) => void
   onOpenTask: (id: number | string) => void
+  tasks: any[]
+  notes: any[]
+  events: any[]
+  scheduleBlocks: any[]
 }
 
 type NotifSheetProps = {
@@ -96,6 +100,95 @@ const DAY_INDEX: Record<string, number> = {
   Vie: 4,
   Sáb: 5,
   Dom: 6,
+}
+
+const createId = (prefix: string) =>
+  `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+
+function displayDate(value?: string) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })
+}
+
+function normalizeTaskItem(item: any) {
+  const due = item.dueDate
+    ? `${displayDate(item.dueDate)}${item.dueTime ? ` · ${item.dueTime}` : ''}`
+    : item.due || ''
+
+  return {
+    ...item,
+    id: item.id || createId('tarea'),
+    title: item.title || 'Nueva tarea',
+    subject: item.subject || '',
+    due,
+    dueShort: item.dueDate ? displayDate(item.dueDate) : item.dueShort || due,
+    priority: item.priority || 'media',
+    status: item.status || 'pendiente',
+    done: item.done ?? item.status === 'entregada',
+    desc: item.desc || item.description || '',
+    attachments: item.attachmentName ? 1 : item.attachments || 0,
+    notesCount: item.notesCount || 0,
+  }
+}
+
+function normalizeNoteItem(item: any, taskId?: string | null) {
+  const noteType = item.noteType || item.type || 'texto'
+  const normalizedType = noteType === 'imagen' ? 'foto' : noteType
+  const tags =
+    typeof item.tags === 'string'
+      ? item.tags.split(',').map((tag: string) => tag.trim()).filter(Boolean)
+      : item.tags || []
+
+  return {
+    ...item,
+    id: item.id || createId('nota'),
+    title: item.title || 'Nueva nota',
+    subject: item.subject || '',
+    type: normalizedType,
+    noteType,
+    date:
+      item.date ||
+      new Date().toLocaleDateString('es-CO', {
+        day: 'numeric',
+        month: 'short',
+      }),
+    tags,
+    content: item.content || item.noteText || item.preview || '',
+    preview: item.preview || item.noteText || item.attachmentName || '',
+    noteText: item.noteText || item.content || '',
+    duration: item.duration || '',
+    audioUrl: item.audioUrl || null,
+    imageUrl: item.imageUrl || null,
+    location: item.location || '',
+    parentId: taskId || item.parentId || '',
+  }
+}
+
+function normalizeEventItem(item: any) {
+  return {
+    ...item,
+    id: item.id || createId('evento'),
+    title: item.title || 'Nuevo evento',
+    date: item.date || '',
+    time: item.time || '',
+    subject: item.subject || '',
+    color: item.color || 1,
+    loc: item.location || item.loc || '',
+    dur: item.dur || '',
+  }
+}
+
+function normalizeReminderItem(item: any) {
+  return {
+    ...item,
+    id: item.id || createId('reminder'),
+    parentId: item.parentId || '',
+    parentTitle: item.parentTitle || item.title || '',
+    date: item.date || '',
+    status: item.status || 'activo',
+  }
 }
 
 function useIsMobile(breakpoint = 820) {
@@ -230,7 +323,7 @@ function UpdateBanner({ onUpdate, onDismiss }: UpdateBannerProps) {
   )
 }
 
-function SearchSheet({ open, onClose, go, onOpenTask }: SearchSheetProps) {
+function SearchSheet({ open, onClose, go, onOpenTask, tasks, notes, events, scheduleBlocks }: SearchSheetProps) {
   const [q, setQ] = useState('')
   const inputRef = useRef<HTMLInputElement | null>(null)
 
@@ -240,13 +333,16 @@ function SearchSheet({ open, onClose, go, onOpenTask }: SearchSheetProps) {
     }
   }, [open])
 
-  const tasks = DATA.tasks.filter((task) =>
-    task.title.toLowerCase().includes(q.toLowerCase()),
-  )
-
-  const notes = DATA.notes.filter((note) =>
-    note.title.toLowerCase().includes(q.toLowerCase()),
-  )
+  const lq = q.toLowerCase()
+  const matchingTasks = q ? tasks.filter((t) => t.title?.toLowerCase().includes(lq)) : []
+  const matchingNotes = q ? notes.filter((n) => n.title?.toLowerCase().includes(lq)) : []
+  const matchingEvents = q ? events.filter((e) => e.title?.toLowerCase().includes(lq)) : []
+  const matchingBlocks = q
+    ? scheduleBlocks.filter((b) => {
+        const name = b.subjectData?.name || b.title || ''
+        return name.toLowerCase().includes(lq)
+      })
+    : []
 
   return (
     <Sheet open={open} onClose={onClose} title="Buscar">
@@ -282,95 +378,60 @@ function SearchSheet({ open, onClose, go, onOpenTask }: SearchSheetProps) {
       </div>
 
       <div style={{ marginTop: 16 }}>
-        {q && tasks.length === 0 && notes.length === 0 && (
-          <EmptyState
-            icon="search"
-            title="Sin resultados"
-            body={`Nada coincide con "${q}".`}
-          />
+        {q && matchingTasks.length === 0 && matchingNotes.length === 0 && matchingEvents.length === 0 && matchingBlocks.length === 0 && (
+          <EmptyState icon="search" title="Sin resultados" body={`Nada coincide con "${q}".`} />
         )}
 
-        {tasks.length > 0 && (
-          <div
-            style={{
-              fontSize: 11.5,
-              fontWeight: 600,
-              letterSpacing: '0.06em',
-              textTransform: 'uppercase',
-              color: 'var(--text-3)',
-              marginBottom: 8,
-            }}
-          >
-            Tareas
-          </div>
+        {matchingTasks.length > 0 && (
+          <div style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-3)', marginBottom: 8 }}>Tareas</div>
         )}
-
-        {tasks.slice(0, 4).map((task) => (
-          <button
-            key={task.id}
-            onClick={() => {
-              onClose()
-              onOpenTask(task.id)
-            }}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 11,
-              width: '100%',
-              padding: '11px 6px',
-              background: 'none',
-              border: 'none',
-              borderBottom: '1px solid var(--border)',
-              cursor: 'pointer',
-              textAlign: 'left',
-            }}
-          >
+        {matchingTasks.slice(0, 4).map((task) => (
+          <button key={task.id} onClick={() => { onClose(); onOpenTask(task.id) }}
+            style={{ display: 'flex', alignItems: 'center', gap: 11, width: '100%', padding: '11px 6px', background: 'none', border: 'none', borderBottom: '1px solid var(--border)', cursor: 'pointer', textAlign: 'left' }}>
             <Icon name="tasks" size={17} color="var(--text-3)" />
-            <span style={{ fontSize: 13.5, color: 'var(--text)' }}>
-              {task.title}
-            </span>
+            <div style={{ minWidth: 0 }}>
+              <span style={{ fontSize: 13.5, color: 'var(--text)', display: 'block' }}>{task.title}</span>
+              {task.dueDate && <span style={{ fontSize: 11.5, color: 'var(--text-3)' }}>Entrega: {task.dueDate}</span>}
+            </div>
           </button>
         ))}
 
-        {notes.length > 0 && (
-          <div
-            style={{
-              fontSize: 11.5,
-              fontWeight: 600,
-              letterSpacing: '0.06em',
-              textTransform: 'uppercase',
-              color: 'var(--text-3)',
-              margin: '14px 0 8px',
-            }}
-          >
-            Notas
-          </div>
+        {matchingNotes.length > 0 && (
+          <div style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-3)', margin: '14px 0 8px' }}>Notas</div>
         )}
-
-        {notes.slice(0, 4).map((note) => (
-          <button
-            key={note.id}
-            onClick={() => {
-              onClose()
-              go('notes')
-            }}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 11,
-              width: '100%',
-              padding: '11px 6px',
-              background: 'none',
-              border: 'none',
-              borderBottom: '1px solid var(--border)',
-              cursor: 'pointer',
-              textAlign: 'left',
-            }}
-          >
+        {matchingNotes.slice(0, 4).map((note) => (
+          <button key={note.id} onClick={() => { onClose(); go('notes') }}
+            style={{ display: 'flex', alignItems: 'center', gap: 11, width: '100%', padding: '11px 6px', background: 'none', border: 'none', borderBottom: '1px solid var(--border)', cursor: 'pointer', textAlign: 'left' }}>
             <Icon name="notes" size={17} color="var(--text-3)" />
-            <span style={{ fontSize: 13.5, color: 'var(--text)' }}>
-              {note.title}
-            </span>
+            <span style={{ fontSize: 13.5, color: 'var(--text)' }}>{note.title}</span>
+          </button>
+        ))}
+
+        {matchingEvents.length > 0 && (
+          <div style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-3)', margin: '14px 0 8px' }}>Eventos</div>
+        )}
+        {matchingEvents.slice(0, 4).map((event) => (
+          <button key={event.id} onClick={() => { onClose(); go('calendar') }}
+            style={{ display: 'flex', alignItems: 'center', gap: 11, width: '100%', padding: '11px 6px', background: 'none', border: 'none', borderBottom: '1px solid var(--border)', cursor: 'pointer', textAlign: 'left' }}>
+            <Icon name="calendar" size={17} color="var(--text-3)" />
+            <div style={{ minWidth: 0 }}>
+              <span style={{ fontSize: 13.5, color: 'var(--text)', display: 'block' }}>{event.title}</span>
+              {event.date && <span style={{ fontSize: 11.5, color: 'var(--text-3)' }}>{event.date}</span>}
+            </div>
+          </button>
+        ))}
+
+        {matchingBlocks.length > 0 && (
+          <div style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-3)', margin: '14px 0 8px' }}>Clases</div>
+        )}
+        {matchingBlocks.slice(0, 4).map((block) => (
+          <button key={block.id} onClick={() => { onClose(); go('schedule') }}
+            style={{ display: 'flex', alignItems: 'center', gap: 11, width: '100%', padding: '11px 6px', background: 'none', border: 'none', borderBottom: '1px solid var(--border)', cursor: 'pointer', textAlign: 'left' }}>
+            <Icon name="clock" size={17} color="var(--text-3)" />
+            <div style={{ minWidth: 0 }}>
+              <span style={{ fontSize: 13.5, color: 'var(--text)', display: 'block' }}>{block.subjectData?.name || block.title}</span>
+              {block.room && <span style={{ fontSize: 11.5, color: 'var(--text-3)' }}>{block.room}</span>}
+            </div>
           </button>
         ))}
       </div>
@@ -381,80 +442,11 @@ function SearchSheet({ open, onClose, go, onOpenTask }: SearchSheetProps) {
 function NotifSheet({ open, onClose }: NotifSheetProps) {
   return (
     <Sheet open={open} onClose={onClose} title="Notificaciones">
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {DATA.notifications.map((notification) => (
-          <div
-            key={notification.id}
-            style={{
-              display: 'flex',
-              gap: 12,
-              padding: '13px',
-              borderRadius: 'var(--r-md)',
-              background: notification.unread
-                ? 'var(--primary-soft)'
-                : 'var(--surface-2)',
-              border: '1px solid var(--border)',
-            }}
-          >
-            <span
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: 'var(--r-sm)',
-                background: cSoftVar(notification.color),
-                color: cVar(notification.color),
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-              }}
-            >
-              <Icon name={notification.icon} size={17} />
-            </span>
-
-            <div style={{ flex: 1 }}>
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  gap: 8,
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: 13.5,
-                    fontWeight: 600,
-                    color: 'var(--text)',
-                  }}
-                >
-                  {notification.title}
-                </span>
-
-                <span
-                  style={{
-                    fontSize: 11,
-                    color: 'var(--text-3)',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {notification.time}
-                </span>
-              </div>
-
-              <div
-                style={{
-                  fontSize: 12.5,
-                  color: 'var(--text-2)',
-                  marginTop: 2,
-                  lineHeight: 1.45,
-                }}
-              >
-                {notification.body}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+      <EmptyState
+        icon="bell"
+        title="No tienes notificaciones"
+        body="Aquí verás avisos de entregas, clases próximas y sincronización."
+      />
     </Sheet>
   )
 }
@@ -540,6 +532,14 @@ export default function App() {
   const [t, setTweak] = useTweaks<TweakValues>(TWEAK_DEFAULTS)
   const theme = t.dark ? 'dark' : 'light'
   const isMobile = useIsMobile()
+  const {
+    tasks,
+    notes,
+    reminders,
+    events,
+    scheduleBlocks,
+    actions: dataActions,
+  } = useData()
 
   window.__UPTGO_MOBILE__ = isMobile
 
@@ -551,9 +551,6 @@ export default function App() {
 
   const [reminderModalOpen, setReminderModalOpen] = useState(false)
   const [reminderParent, setReminderParent] = useState<ReminderParent | null>(null)
-  const [createdScheduleBlocks, setCreatedScheduleBlocks] = useState<any[]>([])
-  const [notes, setNotes] = useState<any[]>(DATA.notes as any[])
-  const [taskNotesMap, setTaskNotesMap] = useState<Record<string, any[]>>({})
   const [createNoteTaskId, setCreateNoteTaskId] = useState<string | null>(null)
   const mainRef = useRef<HTMLElement | null>(null)
   const [headerCollapsed, setHeaderCollapsed] = useState(false)
@@ -568,8 +565,6 @@ export default function App() {
   })
 
   const [openTaskId, setOpenTaskId] = useState<string | number | null>(null)
-  const [tasks, setTasks] = useState(DATA.tasks)
-  const [reminders, setReminders] = useState(DATA.reminders)
   const [sheet, setSheet] = useState<SheetType>(null)
   const [toastMsg, setToastMsg] = useState('')
   const [createModalType, setCreateModalType] = useState<CreateItemType | null>(
@@ -636,26 +631,10 @@ export default function App() {
     return Number(hour)
   }
 
-  const addCreatedClassToSchedule = (item: any) => {
+  const addCreatedClassToSchedule = async (item: any) => {
     if (item.type !== 'clase') return
 
-    const subjectColor =
-      item.subjectMode === 'new'
-        ? ((createdScheduleBlocks.length % 6) + 1)
-        : undefined
-
-    const subjectData =
-      item.subjectMode === 'new'
-        ? {
-          ...(item.subjectData || {}),
-          color: subjectColor,
-        }
-        : null
-
-    const subjectId =
-      item.subjectMode === 'new'
-        ? subjectData?.id
-        : item.subject
+    const subjectData = item.subjectData || null
 
     const blocks = (item.days || [])
       .map((day: string) => ({
@@ -663,7 +642,7 @@ export default function App() {
         day: DAY_INDEX[day],
         start: hourToNumber(item.startTime),
         end: hourToNumber(item.endTime),
-        subject: subjectId,
+        subject: subjectData?.id,
         title: item.title,
         room: item.room || item.location || 'Sin aula',
         location: item.location || '',
@@ -674,30 +653,12 @@ export default function App() {
       }))
       .filter((block: any) => block.day !== undefined)
 
-    setCreatedScheduleBlocks((current) => [...blocks, ...current])
+    await dataActions.scheduleBlocks.upsertMany(blocks)
     setRoute('schedule')
   }
-  const addNote = (item: any) => {
-    const noteType = item.noteType || 'texto'
-    const normalizedType = noteType === 'imagen' ? 'foto' : noteType
-    const newNote = {
-      id: item.id,
-      title: item.title,
-      subject: item.subject || '',
-      type: normalizedType,
-      noteType,
-      date: new Date().toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }),
-      tags: typeof item.tags === 'string'
-        ? item.tags.split(',').map((t: string) => t.trim()).filter(Boolean)
-        : (item.tags || []),
-      preview: item.noteText || item.attachmentName || '',
-      noteText: item.noteText || '',
-      duration: item.duration || '',
-      audioUrl: item.audioUrl || null,
-      imageUrl: item.imageUrl || null,
-      location: item.location || '',
-    }
-    setNotes((prev) => [newNote, ...prev])
+
+  const addNote = async (item: any, taskId?: string | null) => {
+    await dataActions.notes.upsert(normalizeNoteItem(item, taskId))
   }
 
   useEffect(() => {
@@ -716,39 +677,31 @@ export default function App() {
     return () => el.removeEventListener('scroll', handler)
   }, [])
 
-  const updateTask = (id: string | number, changes: Record<string, unknown>) => {
-    setTasks((prev: any[]) => prev.map((t: any) => (t.id === id ? { ...t, ...changes } : t)))
+  const updateTask = async (id: string | number, changes: Record<string, unknown>) => {
+    await dataActions.tasks.update(id, changes as any)
   }
 
-  const toggleTask = (id: string | number) => {
-    setTasks((currentTasks) =>
-      currentTasks.map((task) =>
-        task.id === id
-          ? {
-            ...task,
-            done: !task.done,
-            status: !task.done ? 'entregada' : 'pendiente',
-          }
-          : task,
-      ),
-    )
+  const toggleTask = async (id: string | number) => {
+    const task = tasks.find((item) => item.id === id)
+    if (!task) return
+
+    await dataActions.tasks.update(id, {
+      done: !task.done,
+      status: !task.done ? 'entregada' : 'pendiente',
+    })
   }
 
-  const toggleReminder = (id: string | number) => {
-    setReminders((currentReminders) =>
-      currentReminders.map((reminder) =>
-        reminder.id === id
-          ? {
-            ...reminder,
-            status: reminder.status === 'activo' ? 'completado' : 'activo',
-          }
-          : reminder,
-      ),
-    )
+  const toggleReminder = async (id: string | number) => {
+    const reminder = reminders.find((item) => item.id === id)
+    if (!reminder) return
+
+    await dataActions.reminders.update(id, {
+      status: reminder.status === 'activo' ? 'completado' : 'activo',
+    })
   }
 
-  const unread = DATA.notifications.filter((notification) => notification.unread)
-    .length
+  // No hay historial de notificaciones real todavía — sin backlog que mostrar como no leído.
+  const unread = 0
 
   const online = t.online
   const isError = route === 'offline' || route === 'notfound'
@@ -775,7 +728,7 @@ export default function App() {
         onToggle={toggleTask}
         toast={toast}
         onCreateReminder={openReminderModal}
-        taskNotes={taskNotesMap[String(openTaskId)] || []}
+        taskNotes={notes.filter((note) => String(note.parentId || '') === String(openTaskId))}
         onAddNote={() => {
           setCreateNoteTaskId(String(openTaskId))
           setCreateModalType('nota')
@@ -803,6 +756,19 @@ export default function App() {
             m={isMobile}
             go={go}
             onAdd={() => setCreateModalType('evento')}
+            events={events}
+            onCreated={async (item: any) => {
+              if (item.type === 'evento') {
+                await dataActions.events.upsert(normalizeEventItem(item))
+                toast('Evento creado correctamente')
+              } else if (item.type === 'tarea') {
+                await dataActions.tasks.upsert(normalizeTaskItem(item))
+                toast('Tarea creada correctamente')
+              } else if (item.type === 'clase') {
+                await addCreatedClassToSchedule(item)
+                toast('Clase creada correctamente')
+              }
+            }}
           />
         )
         break
@@ -811,10 +777,10 @@ export default function App() {
         screen = (
           <Schedule
             m={isMobile}
-            scheduleItems={createdScheduleBlocks}
+            scheduleItems={scheduleBlocks}
             onAdd={() => setCreateModalType('clase')}
             toast={toast}
-            onImportSchedule={(blocks: any[]) => setCreatedScheduleBlocks((prev) => [...blocks, ...prev])}
+            onImportSchedule={(blocks: any[]) => dataActions.scheduleBlocks.upsertMany(blocks)}
           />
         )
         break
@@ -826,7 +792,7 @@ export default function App() {
             onAdd={() => setCreateModalType('nota')}
             toast={toast}
             notes={notes}
-            onDeleteNote={(id: string) => setNotes((prev: any[]) => prev.filter((n: any) => n.id !== id))}
+            onDeleteNote={(id: string) => dataActions.notes.remove(id)}
           />
         )
         break
@@ -869,6 +835,8 @@ export default function App() {
             m={isMobile}
             go={go}
             tasks={tasks}
+            events={events}
+            scheduleBlocks={scheduleBlocks}
             onToggle={toggleTask}
             onOpenTask={openTask}
             variant={t.homeVariant}
@@ -877,9 +845,18 @@ export default function App() {
     }
   }
 
+  // authUser solo es null antes de autenticarse, rama en la que este valor nunca se usa (ver !isAuthenticated abajo).
   const displayUser = authUser
-    ? { ...DATA.user, name: authUser.name, email: authUser.email, initials: authUser.initials ?? authUser.name.slice(0, 2).toUpperCase(), program: authUser.program ?? DATA.user.program, short: authUser.name.split(' ')[0], photo: localStorage.getItem('uptgo_user_avatar') }
-    : DATA.user
+    ? {
+        name: authUser.name,
+        email: authUser.email,
+        initials: authUser.initials ?? authUser.name.slice(0, 2).toUpperCase(),
+        program: authUser.program ?? null,
+        semester: authUser.semester ?? null,
+        short: authUser.name.split(' ')[0],
+        photo: localStorage.getItem('uptgo_user_avatar'),
+      }
+    : { name: '', email: '', initials: '', program: null, semester: null, short: '', photo: null }
 
   const appInner = !isAuthenticated ? (
     <Login onLogin={handleLoginSuccess} />
@@ -964,6 +941,10 @@ export default function App() {
           onClose={() => setSheet(null)}
           go={go}
           onOpenTask={openTask}
+          tasks={tasks}
+          notes={notes}
+          events={events}
+          scheduleBlocks={scheduleBlocks}
         />
 
         <NotifSheet
@@ -993,53 +974,41 @@ export default function App() {
           type={createModalType || 'evento'}
           onClose={() => setCreateModalType(null)}
           onCreated={(item) => {
+            void (async () => {
             if (item.type === 'clase') {
-              addCreatedClassToSchedule(item)
+              await addCreatedClassToSchedule(item)
+            } else if (item.type === 'evento') {
+              await dataActions.events.upsert(normalizeEventItem(item))
+            } else if (item.type === 'tarea') {
+              await dataActions.tasks.upsert(normalizeTaskItem(item))
             } else if (item.type === 'nota') {
               if (createNoteTaskId) {
-                const noteType = item.noteType || 'texto'
-                const newNote = {
-                  id: item.id,
-                  title: item.title,
-                  subject: item.subject || '',
-                  type: noteType === 'imagen' ? 'foto' : noteType,
-                  noteType,
-                  date: new Date().toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }),
-                  tags: typeof item.tags === 'string'
-                    ? item.tags.split(',').map((tg: string) => tg.trim()).filter(Boolean)
-                    : (item.tags || []),
-                  preview: item.noteText || item.attachmentName || '',
-                  noteText: item.noteText || '',
-                  duration: item.duration || '',
-                  audioUrl: item.audioUrl || null,
-                  imageUrl: item.imageUrl || null,
-                  location: item.location || '',
-                }
-                setTaskNotesMap((prev) => ({
-                  ...prev,
-                  [createNoteTaskId]: [newNote, ...(prev[createNoteTaskId] || [])],
-                }))
+                await addNote(item, createNoteTaskId)
                 setCreateNoteTaskId(null)
               } else {
-                addNote(item)
+                await addNote(item)
               }
             }
 
             toast(
               `${TYPE_LABEL_TEXT[item.type as CreateItemType]} creado correctamente`,
             )
+            })()
           }}
         />
 
         <CreateReminderModal
           open={reminderModalOpen}
           parent={reminderParent}
+          tasks={tasks}
+          events={events}
+          scheduleBlocks={scheduleBlocks}
           onClose={() => {
             setReminderModalOpen(false)
             setReminderParent(null)
           }}
           onCreated={(reminder) => {
-            setReminders((currentReminders) => [reminder, ...currentReminders])
+            void dataActions.reminders.upsert(normalizeReminderItem(reminder))
             toast(`Recordatorio creado para ${reminder.parentTitle}`)
           }}
         />

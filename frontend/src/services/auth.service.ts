@@ -61,9 +61,7 @@ export const authService = {
       { method: 'POST', body: JSON.stringify({ email }) },
     );
 
-    const credential = await startAuthentication({
-      optionsJSON: options as unknown as Parameters<typeof startAuthentication>[0]['optionsJSON'],
-    });
+    const credential = await startAuthentication({ optionsJSON: options as unknown as Parameters<typeof startAuthentication>[0]['optionsJSON'] });
 
     return apiFetch<AuthResponse>('/auth/webauthn/login/complete', {
       method: 'POST',
@@ -77,9 +75,7 @@ export const authService = {
       { method: 'POST' },
     );
 
-    const credential = await startRegistration({
-      optionsJSON: options as unknown as Parameters<typeof startRegistration>[0]['optionsJSON'],
-    });
+    const credential = await startRegistration({ optionsJSON: options as unknown as Parameters<typeof startRegistration>[0]['optionsJSON'] });
 
     await apiFetch<void>('/auth/webauthn/register/complete', {
       method: 'POST',

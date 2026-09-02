@@ -1,31 +1,9 @@
 import React from 'react'
-import { DATA } from '../data/data'
 import { Icon } from './Icons'
 
 type AnyProps = Record<string, any>
 
-type SubjectFallback = {
-  id: string
-  name: string
-  room: string
-  teacher: string
-  color: number
-  progress: number
-  grade: number
-}
-
-const DEFAULT_SUBJECT: SubjectFallback = {
-  id: 'default',
-  name: 'Sin materia',
-  room: 'Sin aula',
-  teacher: 'Sin docente',
-  color: 1,
-  progress: 0,
-  grade: 0,
-}
-
-export const subjectById = (id: string | number): any =>
-  DATA.subjects.find((subject: any) => subject.id === id) || DEFAULT_SUBJECT
+export { subjectById } from '../services/subjects'
 
 export const cVar = (n: string | number) => `var(--c-${n})`
 

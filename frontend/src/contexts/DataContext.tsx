@@ -1,261 +1,222 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
-import {
-  db,
-  type DbEvent,
-  type DbNote,
-  type DbReminder,
-  type DbScheduleBlock,
-  type DbTask,
+import React from 'react'
+import * as db from '../services/db'
+import type {
+  EventRecord,
+  NoteRecord,
+  ReminderRecord,
+  ScheduleBlockRecord,
+  SubjectData,
+  SyncStatus,
+  TaskRecord,
 } from '../services/db'
+import { deriveSubjects, setSubjectsCache } from '../services/subjects'
 
-type Persisted<T> = T & { id: string; syncStatus: 'pendingSync'; updatedAt: number }
-type NewTask = Omit<DbTask, 'id' | 'syncStatus' | 'updatedAt'>
-type NewNote = Omit<DbNote, 'id' | 'syncStatus' | 'updatedAt'>
-type NewReminder = Omit<DbReminder, 'id' | 'syncStatus' | 'updatedAt'>
-type NewEvent = Omit<DbEvent, 'id' | 'syncStatus' | 'updatedAt'>
-type NewScheduleBlock = Omit<DbScheduleBlock, 'id' | 'syncStatus' | 'updatedAt'>
+type Id = string | number
+type NewRecord<T extends db.DbRecord> = Omit<T, 'syncStatus' | 'updatedAt'> &
+  Partial<Pick<T, 'syncStatus' | 'updatedAt'>>
 
 type DataContextValue = {
-  tasks: DbTask[]
-  notes: DbNote[]
-  reminders: DbReminder[]
-  events: DbEvent[]
-  scheduleBlocks: DbScheduleBlock[]
   loading: boolean
-  addTask: (input: NewTask & { id?: string }) => Promise<DbTask>
-  updateTask: (id: string, changes: Partial<NewTask>) => Promise<void>
-  deleteTask: (id: string) => Promise<void>
-  toggleTask: (id: string) => Promise<void>
-  addNote: (input: NewNote & { id?: string }) => Promise<DbNote>
-  updateNote: (id: string, changes: Partial<NewNote>) => Promise<void>
-  deleteNote: (id: string) => Promise<void>
-  addReminder: (input: NewReminder & { id?: string }) => Promise<DbReminder>
-  updateReminder: (id: string, changes: Partial<NewReminder>) => Promise<void>
-  deleteReminder: (id: string) => Promise<void>
-  toggleReminder: (id: string) => Promise<void>
-  addEvent: (input: NewEvent & { id?: string }) => Promise<DbEvent>
-  updateEvent: (id: string, changes: Partial<NewEvent>) => Promise<void>
-  deleteEvent: (id: string) => Promise<void>
-  addScheduleBlock: (input: NewScheduleBlock & { id?: string }) => Promise<DbScheduleBlock>
-  addScheduleBlocks: (items: Array<NewScheduleBlock & { id?: string }>) => Promise<DbScheduleBlock[]>
-  updateScheduleBlock: (id: string, changes: Partial<NewScheduleBlock>) => Promise<void>
-  removeScheduleBlock: (id: string) => Promise<void>
-}
-
-const DataContext = createContext<DataContextValue | null>(null)
-
-function makeId(prefix: string): string {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-}
-
-function asPending<T extends object>(prefix: string, input: T & { id?: string }): Persisted<T> {
-  return {
-    ...input,
-    id: input.id || makeId(prefix),
-    syncStatus: 'pendingSync',
-    updatedAt: Date.now(),
+  tasks: TaskRecord[]
+  notes: NoteRecord[]
+  reminders: ReminderRecord[]
+  events: EventRecord[]
+  scheduleBlocks: ScheduleBlockRecord[]
+  subjects: SubjectData[]
+  actions: {
+    tasks: CrudActions<TaskRecord>
+    notes: CrudActions<NoteRecord>
+    reminders: CrudActions<ReminderRecord>
+    events: CrudActions<EventRecord>
+    scheduleBlocks: CrudActions<ScheduleBlockRecord> & {
+      upsertMany: (records: NewRecord<ScheduleBlockRecord>[]) => Promise<void>
+    }
   }
 }
 
-function byUpdatedAt<T extends { updatedAt: number }>(items: T[]): T[] {
-  return [...items].sort((a, b) => b.updatedAt - a.updatedAt)
+type CrudActions<T extends db.DbRecord> = {
+  getById: (id: Id) => Promise<T | undefined>
+  upsert: (record: NewRecord<T>) => Promise<T>
+  update: (id: Id, changes: Partial<T>) => Promise<T | undefined>
+  remove: (id: Id) => Promise<void>
+}
+
+const DataContext = React.createContext<DataContextValue | null>(null)
+
+const markPending = <T extends db.DbRecord>(record: NewRecord<T>): T => ({
+  ...record,
+  syncStatus: 'pendingSync' as SyncStatus,
+  updatedAt: new Date().toISOString(),
+}) as T
+
+function sortByUpdatedAt<T extends { updatedAt?: string }>(items: T[]) {
+  return [...items].sort((a, b) => {
+    const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0
+    const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0
+    return bTime - aTime
+  })
+}
+
+function createCrudActions<T extends db.DbRecord>(
+  store: {
+    getById: (id: Id) => Promise<T | undefined>
+    upsert: (record: T) => Promise<T>
+    remove: (id: Id) => Promise<void>
+  },
+  setItems: React.Dispatch<React.SetStateAction<T[]>>,
+): CrudActions<T> {
+  return {
+    getById: (id) => store.getById(id),
+
+    async upsert(record) {
+      const pendingRecord = markPending<T>(record)
+      await store.upsert(pendingRecord)
+      setItems((current) => {
+        const exists = current.some((item) => item.id === pendingRecord.id)
+        const next = exists
+          ? current.map((item) =>
+              item.id === pendingRecord.id ? pendingRecord : item,
+            )
+          : [pendingRecord, ...current]
+
+        return sortByUpdatedAt(next)
+      })
+      return pendingRecord
+    },
+
+    async update(id, changes) {
+      const existing = await store.getById(id)
+      if (!existing) return undefined
+
+      const updated = markPending<T>({
+        ...existing,
+        ...changes,
+        id,
+      })
+
+      await store.upsert(updated)
+      setItems((current) =>
+        sortByUpdatedAt(
+          current.map((item) => (item.id === id ? updated : item)),
+        ),
+      )
+      return updated
+    },
+
+    async remove(id) {
+      await store.remove(id)
+      setItems((current) => current.filter((item) => item.id !== id))
+    },
+  }
 }
 
 export function DataProvider({ children }: { children: React.ReactNode }) {
-  const [tasks, setTasks] = useState<DbTask[]>([])
-  const [notes, setNotes] = useState<DbNote[]>([])
-  const [reminders, setReminders] = useState<DbReminder[]>([])
-  const [events, setEvents] = useState<DbEvent[]>([])
-  const [scheduleBlocks, setScheduleBlocks] = useState<DbScheduleBlock[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = React.useState(true)
+  const [tasksState, setTasksState] = React.useState<TaskRecord[]>([])
+  const [notesState, setNotesState] = React.useState<NoteRecord[]>([])
+  const [remindersState, setRemindersState] = React.useState<ReminderRecord[]>([])
+  const [eventsState, setEventsState] = React.useState<EventRecord[]>([])
+  const [scheduleBlocksState, setScheduleBlocksState] = React.useState<
+    ScheduleBlockRecord[]
+  >([])
 
-  useEffect(() => {
-    let active = true
+  React.useEffect(() => {
+    let cancelled = false
 
-    Promise.all([
-      db.tasks.getAll(),
-      db.notes.getAll(),
-      db.reminders.getAll(),
-      db.events.getAll(),
-      db.scheduleBlocks.getAll(),
-    ]).then(([storedTasks, storedNotes, storedReminders, storedEvents, storedScheduleBlocks]) => {
-      if (!active) return
-      setTasks(byUpdatedAt(storedTasks))
-      setNotes(byUpdatedAt(storedNotes))
-      setReminders(byUpdatedAt(storedReminders))
-      setEvents(byUpdatedAt(storedEvents))
-      setScheduleBlocks(storedScheduleBlocks)
+    async function load() {
+      const [storedTasks, storedNotes, storedReminders, storedEvents, storedBlocks] =
+        await Promise.all([
+          db.tasks.getAll(),
+          db.notes.getAll(),
+          db.reminders.getAll(),
+          db.events.getAll(),
+          db.scheduleBlocks.getAll(),
+        ])
+
+      if (cancelled) return
+
+      setTasksState(sortByUpdatedAt(storedTasks))
+      setNotesState(sortByUpdatedAt(storedNotes))
+      setRemindersState(sortByUpdatedAt(storedReminders))
+      setEventsState(sortByUpdatedAt(storedEvents))
+      setScheduleBlocksState(sortByUpdatedAt(storedBlocks))
       setLoading(false)
-    }).catch(() => {
-      if (active) setLoading(false)
+    }
+
+    void load().catch(() => {
+      if (!cancelled) setLoading(false)
     })
 
     return () => {
-      active = false
+      cancelled = true
     }
   }, [])
 
-  const value = useMemo<DataContextValue>(() => {
-    const addTask = async (input: NewTask & { id?: string }) => {
-      const item = asPending('task', input) as DbTask
-      await db.tasks.upsert(item)
-      setTasks((current) => [item, ...current.filter((task) => task.id !== item.id)])
-      return item
-    }
+  const subjects = React.useMemo(
+    () => deriveSubjects(scheduleBlocksState),
+    [scheduleBlocksState],
+  )
 
-    const updateTask = async (id: string, changes: Partial<NewTask>) => {
-      const existing = tasks.find((task) => task.id === id)
-      if (!existing) return
-      const updated: DbTask = { ...existing, ...changes, syncStatus: 'pendingSync', updatedAt: Date.now() }
-      await db.tasks.upsert(updated)
-      setTasks((current) => current.map((task) => (task.id === id ? updated : task)))
-    }
+  // Se actualiza en el cuerpo del render (no en un efecto) para que subjectById()
+  // ya vea las materias vigentes durante este mismo render, no uno después.
+  setSubjectsCache(subjects)
 
-    const deleteTask = async (id: string) => {
-      await db.tasks.remove(id)
-      setTasks((current) => current.filter((task) => task.id !== id))
-    }
-
-    const toggleTask = async (id: string) => {
-      const existing = tasks.find((task) => task.id === id)
-      if (!existing) return
-      await updateTask(id, {
-        done: !existing.done,
-        status: !existing.done ? 'entregada' : 'pendiente',
-      })
-    }
-
-    const addNote = async (input: NewNote & { id?: string }) => {
-      const item = asPending('note', input) as DbNote
-      await db.notes.upsert(item)
-      setNotes((current) => [item, ...current.filter((note) => note.id !== item.id)])
-      return item
-    }
-
-    const updateNote = async (id: string, changes: Partial<NewNote>) => {
-      const existing = notes.find((note) => note.id === id)
-      if (!existing) return
-      const updated: DbNote = { ...existing, ...changes, syncStatus: 'pendingSync', updatedAt: Date.now() }
-      await db.notes.upsert(updated)
-      setNotes((current) => current.map((note) => (note.id === id ? updated : note)))
-    }
-
-    const deleteNote = async (id: string) => {
-      await db.notes.remove(id)
-      setNotes((current) => current.filter((note) => note.id !== id))
-    }
-
-    const addReminder = async (input: NewReminder & { id?: string }) => {
-      const item = asPending('reminder', input) as DbReminder
-      await db.reminders.upsert(item)
-      setReminders((current) => [item, ...current.filter((reminder) => reminder.id !== item.id)])
-      return item
-    }
-
-    const updateReminder = async (id: string, changes: Partial<NewReminder>) => {
-      const existing = reminders.find((reminder) => reminder.id === id)
-      if (!existing) return
-      const updated: DbReminder = { ...existing, ...changes, syncStatus: 'pendingSync', updatedAt: Date.now() }
-      await db.reminders.upsert(updated)
-      setReminders((current) => current.map((reminder) => (reminder.id === id ? updated : reminder)))
-    }
-
-    const deleteReminder = async (id: string) => {
-      await db.reminders.remove(id)
-      setReminders((current) => current.filter((reminder) => reminder.id !== id))
-    }
-
-    const toggleReminder = async (id: string) => {
-      const existing = reminders.find((reminder) => reminder.id === id)
-      if (!existing) return
-      await updateReminder(id, {
-        status: existing.status === 'activo' ? 'completado' : 'activo',
-      })
-    }
-
-    const addEvent = async (input: NewEvent & { id?: string }) => {
-      const item = asPending('event', input) as DbEvent
-      await db.events.upsert(item)
-      setEvents((current) => [item, ...current.filter((event) => event.id !== item.id)])
-      return item
-    }
-
-    const updateEvent = async (id: string, changes: Partial<NewEvent>) => {
-      const existing = events.find((event) => event.id === id)
-      if (!existing) return
-      const updated: DbEvent = { ...existing, ...changes, syncStatus: 'pendingSync', updatedAt: Date.now() }
-      await db.events.upsert(updated)
-      setEvents((current) => current.map((event) => (event.id === id ? updated : event)))
-    }
-
-    const deleteEvent = async (id: string) => {
-      await db.events.remove(id)
-      setEvents((current) => current.filter((event) => event.id !== id))
-    }
-
-    const addScheduleBlock = async (input: NewScheduleBlock & { id?: string }) => {
-      const item = asPending('block', input) as DbScheduleBlock
-      await db.scheduleBlocks.upsert(item)
-      setScheduleBlocks((current) => [item, ...current.filter((block) => block.id !== item.id)])
-      return item
-    }
-
-    const addScheduleBlocks = async (items: Array<NewScheduleBlock & { id?: string }>) => {
-      const pendingItems = items.map((item) => asPending('block', item) as DbScheduleBlock)
-      await db.scheduleBlocks.upsertMany(pendingItems)
-      setScheduleBlocks((current) => {
-        const pendingIds = new Set(pendingItems.map((item) => item.id))
-        return [...pendingItems, ...current.filter((block) => !pendingIds.has(block.id))]
-      })
-      return pendingItems
-    }
-
-    const updateScheduleBlock = async (id: string, changes: Partial<NewScheduleBlock>) => {
-      const existing = scheduleBlocks.find((block) => block.id === id)
-      if (!existing) return
-      const updated: DbScheduleBlock = { ...existing, ...changes, syncStatus: 'pendingSync', updatedAt: Date.now() }
-      await db.scheduleBlocks.upsert(updated)
-      setScheduleBlocks((current) => current.map((block) => (block.id === id ? updated : block)))
-    }
-
-    const removeScheduleBlock = async (id: string) => {
-      await db.scheduleBlocks.remove(id)
-      setScheduleBlocks((current) => current.filter((block) => block.id !== id))
-    }
+  const value = React.useMemo<DataContextValue>(() => {
+    const scheduleCrud = createCrudActions(db.scheduleBlocks, setScheduleBlocksState)
 
     return {
-      tasks,
-      notes,
-      reminders,
-      events,
-      scheduleBlocks,
       loading,
-      addTask,
-      updateTask,
-      deleteTask,
-      toggleTask,
-      addNote,
-      updateNote,
-      deleteNote,
-      addReminder,
-      updateReminder,
-      deleteReminder,
-      toggleReminder,
-      addEvent,
-      updateEvent,
-      deleteEvent,
-      addScheduleBlock,
-      addScheduleBlocks,
-      updateScheduleBlock,
-      removeScheduleBlock,
+      tasks: tasksState,
+      notes: notesState,
+      reminders: remindersState,
+      events: eventsState,
+      scheduleBlocks: scheduleBlocksState,
+      subjects,
+      actions: {
+        tasks: createCrudActions(db.tasks, setTasksState),
+        notes: createCrudActions(db.notes, setNotesState),
+        reminders: createCrudActions(db.reminders, setRemindersState),
+        events: createCrudActions(db.events, setEventsState),
+        scheduleBlocks: {
+          ...scheduleCrud,
+          async upsertMany(records) {
+            const pendingRecords = records.map((record) =>
+              markPending<ScheduleBlockRecord>(record),
+            )
+
+            await Promise.all(
+              pendingRecords.map((record) => db.scheduleBlocks.upsert(record)),
+            )
+
+            setScheduleBlocksState((current) => {
+              const byId = new Map<Id, ScheduleBlockRecord>()
+              for (const item of current) byId.set(item.id, item)
+              for (const item of pendingRecords) byId.set(item.id, item)
+              return sortByUpdatedAt([...byId.values()])
+            })
+          },
+        },
+      },
     }
-  }, [events, loading, notes, reminders, scheduleBlocks, tasks])
+  }, [
+    eventsState,
+    loading,
+    notesState,
+    remindersState,
+    scheduleBlocksState,
+    subjects,
+    tasksState,
+  ])
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>
 }
 
-export function useData(): DataContextValue {
-  const context = useContext(DataContext)
-  if (!context) throw new Error('useData must be used inside DataProvider')
+export function useData() {
+  const context = React.useContext(DataContext)
+
+  if (!context) {
+    throw new Error('useData must be used inside DataProvider')
+  }
+
   return context
 }

@@ -57,8 +57,12 @@ export class NotificationsController {
       'Si el endpoint ya está registrado para este usuario, devuelve la suscripción existente.',
   })
   @ApiCreatedResponse({ type: SubscriptionResponseDto })
-  @ApiConflictResponse({ description: 'Endpoint ya registrado por otro usuario' })
-  @ApiUnauthorizedResponse({ description: 'Token ausente, inválido o expirado' })
+  @ApiConflictResponse({
+    description: 'Endpoint ya registrado por otro usuario',
+  })
+  @ApiUnauthorizedResponse({
+    description: 'Token ausente, inválido o expirado',
+  })
   subscribe(
     @CurrentUser() user: User,
     @Body() dto: CreateSubscriptionDto,
@@ -69,9 +73,13 @@ export class NotificationsController {
   @Get('subscriptions')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Listar suscripciones push del usuario autenticado' })
+  @ApiOperation({
+    summary: 'Listar suscripciones push del usuario autenticado',
+  })
   @ApiOkResponse({ type: [SubscriptionResponseDto] })
-  @ApiUnauthorizedResponse({ description: 'Token ausente, inválido o expirado' })
+  @ApiUnauthorizedResponse({
+    description: 'Token ausente, inválido o expirado',
+  })
   findMine(@CurrentUser() user: User): Promise<SubscriptionResponseDto[]> {
     return this.notificationsService.findByUser(user.id);
   }
@@ -82,11 +90,14 @@ export class NotificationsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Eliminar suscripción push',
-    description: 'Desregistra el dispositivo. Útil para cerrar sesión o revocar notificaciones.',
+    description:
+      'Desregistra el dispositivo. Útil para cerrar sesión o revocar notificaciones.',
   })
   @ApiNoContentResponse({ description: 'Suscripción eliminada' })
   @ApiNotFoundResponse({ description: 'Suscripción no encontrada' })
-  @ApiUnauthorizedResponse({ description: 'Token ausente, inválido o expirado' })
+  @ApiUnauthorizedResponse({
+    description: 'Token ausente, inválido o expirado',
+  })
   remove(
     @CurrentUser() user: User,
     @Param('id', ParseUUIDPipe) id: string,
@@ -104,8 +115,12 @@ export class NotificationsController {
       'Envía una notificación push de prueba al usuario autenticado en todos sus dispositivos registrados. ' +
       'Respeta las preferencias de notificación.',
   })
-  @ApiNoContentResponse({ description: 'Notificación enviada (o ignorada por preferencias)' })
-  @ApiUnauthorizedResponse({ description: 'Token ausente, inválido o expirado' })
+  @ApiNoContentResponse({
+    description: 'Notificación enviada (o ignorada por preferencias)',
+  })
+  @ApiUnauthorizedResponse({
+    description: 'Token ausente, inválido o expirado',
+  })
   async sendTest(
     @CurrentUser() user: User,
     @Body() dto: SendTestNotificationDto,

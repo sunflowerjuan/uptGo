@@ -1,5 +1,4 @@
 import React from 'react'
-import { DATA } from '../data/data'
 import { Icon } from '../components/Icons'
 import {
   Button,
@@ -461,7 +460,7 @@ function NoteCard({ n, onOpen }: AnyProps) {
 }
 
 export function Notes({ m, onAdd, toast: _toast, notes: notesProp, onDeleteNote }: AnyProps) {
-  const notes: AnyProps[] = notesProp ?? DATA.notes
+  const notes: AnyProps[] = notesProp ?? []
   const [type, setType] = React.useState('all')
   const [openNote, setOpenNote] = React.useState<AnyProps | null>(null)
 

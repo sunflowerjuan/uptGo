@@ -1,9 +1,79 @@
-import { DATA } from '../data/data'
 import { useEffect, useState } from 'react'
+import { useAuth } from '../contexts/AuthContext'
 import { Icon } from '../components/Icons'
 import { Button, Card, FadeIn, Pill, PRIORITY, SectionTitle, cSoftVar, cVar, subjectById, } from '../components/UI'
 
 type AnyProps = Record<string, any>
+
+const DAYS_ES = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']
+const MONTHS_ES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+
+function todayLabel() {
+  const d = new Date()
+  return `${DAYS_ES[d.getDay()].charAt(0).toUpperCase() + DAYS_ES[d.getDay()].slice(1)}, ${d.getDate()} de ${MONTHS_ES[d.getMonth()]} de ${d.getFullYear()}`
+}
+
+function timeLeft(dueDate: string, dueTime?: string): string {
+  const target = dueTime
+    ? new Date(`${dueDate}T${dueTime}`)
+    : new Date(`${dueDate}T23:59:00`)
+  const diffMs = target.getTime() - Date.now()
+  if (diffMs <= 0) return 'vencida'
+  const mins = Math.floor(diffMs / 60000)
+  if (mins < 60) return `${mins} min`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours} hora${hours > 1 ? 's' : ''}`
+  const days = Math.floor(hours / 24)
+  return `${days} día${days > 1 ? 's' : ''}`
+}
+
+function getSoonestTask(tasks: any[]): any | null {
+  const today = new Date().toISOString().slice(0, 10)
+  return tasks
+    .filter((t) => !t.done && t.dueDate && t.dueDate >= today)
+    .sort((a, b) => {
+      const aMs = new Date(a.dueTime ? `${a.dueDate}T${a.dueTime}` : `${a.dueDate}T23:59`).getTime()
+      const bMs = new Date(b.dueTime ? `${b.dueDate}T${b.dueTime}` : `${b.dueDate}T23:59`).getTime()
+      return aMs - bMs
+    })[0] ?? null
+}
+
+// JS getDay(): 0=Sun → appDay 6; 1=Mon → 0; ... 6=Sat → 5
+const jsToAppDay = (jsDay: number) => (jsDay === 0 ? 6 : jsDay - 1)
+
+function getTodayBlocks(scheduleBlocks: any[]): any[] {
+  const appDay = jsToAppDay(new Date().getDay())
+  return scheduleBlocks
+    .filter((b) => Number(b.day) === appDay)
+    .sort((a, b) => a.start - b.start)
+}
+
+/** Días consecutivos (hoy o ayer hacia atrás) con al menos una tarea completada. */
+function computeStreak(tasks: any[]): number {
+  const completedDays = new Set(
+    tasks
+      .filter((t) => t.done && t.updatedAt)
+      .map((t) => String(t.updatedAt).slice(0, 10)),
+  )
+
+  if (completedDays.size === 0) return 0
+
+  const dayKey = (offset: number) => {
+    const d = new Date()
+    d.setDate(d.getDate() - offset)
+    return d.toISOString().slice(0, 10)
+  }
+
+  // La racha sigue viva si hubo actividad hoy o ayer, para que no se resetee a medianoche.
+  let offset = completedDays.has(dayKey(0)) ? 0 : 1
+  let streak = 0
+  while (completedDays.has(dayKey(offset))) {
+    streak++
+    offset++
+  }
+
+  return streak
+}
 
 function MetricCard({ icon, color, label, value, sub, onClick }: AnyProps) {
   return (
@@ -75,7 +145,35 @@ function EventRow({ e, last }: AnyProps) {
   )
 }
 
-function HeroFocus({ m, onOpenTask, go }: AnyProps) {
+function ScheduleRow({ b, last }: AnyProps) {
+  const color = b.subjectData?.color ?? b.color ?? 1
+  const name = b.subjectData?.name || b.title || 'Clase'
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return (
+    <div style={{ width: '100%', minWidth: 0, display: 'flex', gap: 12, padding: '10px 0', borderBottom: last ? 'none' : '1px solid var(--border)', overflow: 'hidden' }}>
+      <div style={{ minWidth: 46, fontSize: 12, color: 'var(--text-2)', fontWeight: 600, paddingTop: 1, fontFamily: 'var(--font-display)' }}>{pad(b.start)}:00</div>
+      <div style={{ width: 3, borderRadius: 3, background: cVar(color), flexShrink: 0 }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13.5, color: 'var(--text)', fontWeight: 500, overflowWrap: 'anywhere' }}>{name}</div>
+        <div style={{ fontSize: 11.5, color: 'var(--text-3)', marginTop: 2, display: 'flex', gap: 6, alignItems: 'center' }}>
+          <Icon name="mapPin" size={12} />
+          {b.room || 'Sin aula'} · hasta {pad(b.end)}:00
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function HeroFocus({ m, tasks, onOpenTask, go }: AnyProps) {
+  const task = getSoonestTask(tasks)
+  if (!task) {
+    return (
+      <div style={{ borderRadius: 'var(--r-lg)', overflow: 'hidden', position: 'relative', background: 'linear-gradient(145deg, var(--primary), var(--primary-hover))', color: 'var(--on-primary)', padding: m ? '20px' : '28px 30px', boxShadow: 'var(--shadow-md)' }}>
+        <div style={{ position: 'relative', zIndex: 1, fontSize: 15, opacity: 0.9 }}>Sin entregas próximas. ¡Todo al día!</div>
+      </div>
+    )
+  }
+  const left = timeLeft(task.dueDate, task.dueTime)
   return (
     <div style={{
       borderRadius: 'var(--r-lg)', overflow: 'hidden', position: 'relative',
@@ -88,15 +186,15 @@ function HeroFocus({ m, onOpenTask, go }: AnyProps) {
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, marginTop: 10, flexWrap: 'wrap' }}>
           <div>
             <div style={{ fontSize: m ? 22 : 28, fontWeight: 600, fontFamily: 'var(--font-display)', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
-              Entrega: Proyecto de Bases de Datos
+              Entrega: {task.title}
             </div>
             <div style={{ fontSize: 14, opacity: 0.92, marginTop: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
               <Icon name="clock" size={16} color="#fff" />
-              Hoy 11:59 p.m. · quedan 3 horas
+              {task.dueDate}{task.dueTime ? ` ${task.dueTime}` : ''} · quedan {left}
             </div>
           </div>
           <div style={{ display: 'flex', gap: 9 }}>
-            <button onClick={() => onOpenTask('t1')} style={{ padding: '11px 18px', borderRadius: 'var(--r-sm)', border: 'none', cursor: 'pointer', background: 'var(--surface)', color: 'var(--primary-text)', fontFamily: 'var(--font-ui)', fontSize: 14, fontWeight: 600 }}>Ver tarea</button>
+            <button onClick={() => onOpenTask(task.id)} style={{ padding: '11px 18px', borderRadius: 'var(--r-sm)', border: 'none', cursor: 'pointer', background: 'var(--surface)', color: 'var(--primary-text)', fontFamily: 'var(--font-ui)', fontSize: 14, fontWeight: 600 }}>Ver tarea</button>
             <button onClick={() => go('schedule')} style={{ padding: '11px 16px', borderRadius: 'var(--r-sm)', border: '1.5px solid oklch(1 0 0 / 0.4)', cursor: 'pointer', background: 'transparent', color: '#fff', fontFamily: 'var(--font-ui)', fontSize: 14, fontWeight: 600 }}>Horario</button>
           </div>
         </div>
@@ -261,13 +359,17 @@ function MiniMapCard({ onClick }: AnyProps) {
     </Card>
   )
 }
-export function Dashboard({ m, go, tasks, onToggle, onOpenTask, variant = 'resumen' }: AnyProps) {
+export function Dashboard({ m, go, tasks, events = [], scheduleBlocks = [], onToggle, onOpenTask, variant = 'resumen' }: AnyProps) {
+  const { user } = useAuth()
   const upcoming = tasks.filter((t: any) => !t.done).slice(0, 4)
   const pend = tasks.filter((t: any) => !t.done).length
   const altas = tasks.filter((t: any) => !t.done && t.priority === 'alta').length
   const hour = new Date().getHours()
   const greet = hour < 12 ? 'Buenos días' : hour < 19 ? 'Buenas tardes' : 'Buenas noches'
   const enfoque = variant === 'enfoque'
+  const soonest = getSoonestTask(tasks)
+  const todayBlocks = getTodayBlocks(scheduleBlocks)
+  const streak = computeStreak(tasks)
 
   return (
     <div
@@ -281,51 +383,35 @@ export function Dashboard({ m, go, tasks, onToggle, onOpenTask, variant = 'resum
         >
           <div>
             <h1 style={{ fontSize: m ? 22 : 25, fontWeight: 600, color: 'var(--text)', letterSpacing: '-0.02em', fontFamily: 'var(--font-display)' }}>
-              {greet}, {DATA.user.short.split(' ')[0]}
+              {greet}{user?.name ? `, ${user.name.split(' ')[0]}` : ''}
             </h1>
-            <p style={{ fontSize: 13, color: 'var(--text-3)', marginTop: 3 }}>Viernes, 8 de mayo de 2026</p>
+            <p style={{ fontSize: 13, color: 'var(--text-3)', marginTop: 3 }}>{todayLabel()}</p>
           </div>
-          {!m && <Pill color="var(--primary-text)" bg="var(--primary-soft)" style={{ fontSize: 12, padding: '6px 13px' }}>{DATA.user.semester}</Pill>}
+          {!m && user?.semester && <Pill color="var(--primary-text)" bg="var(--primary-soft)" style={{ fontSize: 12, padding: '6px 13px' }}>{user.semester}</Pill>}
         </div>
       </FadeIn>
 
       <FadeIn delay={60}>
         {enfoque ? (
-          <HeroFocus m={m} onOpenTask={onOpenTask} go={go} />
-        ) : (
+          <HeroFocus m={m} tasks={tasks} onOpenTask={onOpenTask} go={go} />
+        ) : soonest ? (
           <div
             style={{
-              width: '100%',
-              minWidth: 0,
-              maxWidth: '100%',
-              display: 'flex',
-              alignItems: m ? 'flex-start' : 'center',
-              gap: 11,
-              padding: m ? '12px' : '13px 16px',
-              borderRadius: 'var(--r-md)',
-              background: 'var(--primary-soft)',
-              border: '1px solid color-mix(in oklch, var(--primary) 18%, transparent)',
-              overflow: 'hidden',
+              width: '100%', minWidth: 0, maxWidth: '100%', display: 'flex',
+              alignItems: m ? 'flex-start' : 'center', gap: 11, padding: m ? '12px' : '13px 16px',
+              borderRadius: 'var(--r-md)', background: 'var(--primary-soft)',
+              border: '1px solid color-mix(in oklch, var(--primary) 18%, transparent)', overflow: 'hidden',
             }}
           >
             <span style={{ width: 34, height: 34, borderRadius: 'var(--r-sm)', background: 'var(--primary)', color: 'var(--on-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <Icon name="flag" size={17} stroke={2} />
             </span>
-            <div
-              style={{
-                flex: 1,
-                minWidth: 0,
-                fontSize: 13,
-                color: 'var(--primary-text)',
-                lineHeight: 1.4,
-                overflowWrap: 'anywhere',
-              }}
-            >
-              <strong style={{ fontWeight: 600 }}>Entrega hoy:</strong> Proyecto de Bases de Datos · 11:59 p.m. — quedan <strong>3 horas</strong>.
+            <div style={{ flex: 1, minWidth: 0, fontSize: 13, color: 'var(--primary-text)', lineHeight: 1.4, overflowWrap: 'anywhere' }}>
+              <strong style={{ fontWeight: 600 }}>Próxima entrega:</strong> {soonest.title} — quedan <strong>{timeLeft(soonest.dueDate, soonest.dueTime)}</strong>.
             </div>
-            {!m && <Button size="sm" variant="primary" onClick={() => onOpenTask('t1')}>Ver tarea</Button>}
+            {!m && <Button size="sm" variant="primary" onClick={() => onOpenTask(soonest.id)}>Ver tarea</Button>}
           </div>
-        )}
+        ) : null}
       </FadeIn>
 
       <FadeIn delay={120}>
@@ -341,9 +427,15 @@ export function Dashboard({ m, go, tasks, onToggle, onOpenTask, variant = 'resum
           }}
         >
           <MetricCard icon="tasks" color={1} label="Pendientes" value={pend} sub={`${altas} de alta prioridad`} onClick={() => go('tasks')} />
-          <MetricCard icon="clock" color={2} label="Clases hoy" value="4" sub="Próxima en 1 h 20 m" onClick={() => go('schedule')} />
+          <MetricCard icon="clock" color={2} label="Eventos hoy" value={events.length} sub="Guardados localmente" onClick={() => go('calendar')} />
           {!m && <MiniMapCard onClick={() => go('map')} />}
-          <MetricCard icon="flame" color={4} label="Racha" value={`${DATA.user.streak} d`} sub="¡Sigue así!" />
+          <MetricCard
+            icon="flame"
+            color={4}
+            label="Racha"
+            value={`${streak} d`}
+            sub={streak > 0 ? '¡Sigue así!' : 'Completa una tarea hoy'}
+          />
         </div>
       </FadeIn>
 
@@ -358,7 +450,7 @@ export function Dashboard({ m, go, tasks, onToggle, onOpenTask, variant = 'resum
         <FadeIn delay={240}>
           <Card pad={m ? 16 : 18}>
             <SectionTitle action="Calendario" onAction={() => go('calendar')}>Eventos de hoy</SectionTitle>
-            <div>{DATA.events.map((e: any, i: number) => <EventRow key={e.id} e={e} last={i === DATA.events.length - 1} />)}</div>
+            <div>{events.map((e: any, i: number) => <EventRow key={e.id} e={e} last={i === events.length - 1} />)}</div>
           </Card>
         </FadeIn>
       </div>
@@ -366,13 +458,17 @@ export function Dashboard({ m, go, tasks, onToggle, onOpenTask, variant = 'resum
       <FadeIn delay={300}>
         <Card pad={m ? 16 : 18}>
           <SectionTitle action="Ver horario" onAction={() => go('schedule')}>
-            Próximas clases
+            Clases de hoy
           </SectionTitle>
 
           <div>
-            {DATA.events.slice(0, 4).map((e: any, i: number) => (
-              <EventRow key={e.id} e={e} last={i === 3} />
-            ))}
+            {todayBlocks.length === 0 ? (
+              <div style={{ fontSize: 13, color: 'var(--text-3)', padding: '10px 0' }}>Sin clases programadas para hoy.</div>
+            ) : (
+              todayBlocks.slice(0, 4).map((b: any, i: number) => (
+                <ScheduleRow key={b.id ?? `${b.day}-${b.start}`} b={b} last={i === Math.min(todayBlocks.length, 4) - 1} />
+              ))
+            )}
           </div>
         </Card>
       </FadeIn>
