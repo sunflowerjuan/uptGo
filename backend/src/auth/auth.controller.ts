@@ -49,10 +49,13 @@ export class AuthController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
     summary: 'Registrar cuenta con email y contraseña',
-    description: 'Crea una nueva cuenta de usuario. La contraseña se hashea con Argon2id antes de almacenarse.',
+    description:
+      'Crea una nueva cuenta de usuario. La contraseña se hashea con Argon2id antes de almacenarse.',
   })
   @ApiCreatedResponse({ type: AuthResponseDto })
-  @ApiConflictResponse({ description: 'El correo electrónico ya está registrado' })
+  @ApiConflictResponse({
+    description: 'El correo electrónico ya está registrado',
+  })
   register(@Body() dto: RegisterDto): Promise<AuthResponseDto> {
     return this.authService.register(dto);
   }
@@ -61,7 +64,8 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Iniciar sesión con email y contraseña',
-    description: 'Verifica las credenciales con Argon2id y emite un par de JWT (access + refresh).',
+    description:
+      'Verifica las credenciales con Argon2id y emite un par de JWT (access + refresh).',
   })
   @ApiOkResponse({ type: AuthResponseDto })
   @ApiUnauthorizedResponse({ description: 'Credenciales inválidas' })
@@ -75,20 +79,26 @@ export class AuthController {
   @UseGuards(GoogleOAuthGuard)
   @ApiOperation({
     summary: 'Iniciar autenticación con Google',
-    description: 'Redirige al usuario al flujo de consentimiento de Google OAuth 2.0 (incluye scope de Google Drive).',
+    description:
+      'Redirige al usuario al flujo de consentimiento de Google OAuth 2.0 (incluye scope de Google Drive).',
   })
   googleAuth(): void {}
 
   @Get('google/callback')
   @UseGuards(GoogleOAuthGuard)
   @ApiExcludeEndpoint()
-  async googleAuthCallback(
-    @CurrentUser() user: User,
-    @Res() res: Response,
-  ): Promise<void> {
-    const { accessToken, refreshToken } = this.authService.generateTokens(user.id, user.email);
-    const frontendUrl = this.config.get<string>('CORS_ORIGIN', 'http://localhost:5173');
-    res.redirect(`${frontendUrl}/auth/callback?accessToken=${accessToken}&refreshToken=${refreshToken}`);
+  googleAuthCallback(@CurrentUser() user: User, @Res() res: Response): void {
+    const { accessToken, refreshToken } = this.authService.generateTokens(
+      user.id,
+      user.email,
+    );
+    const frontendUrl = this.config.get<string>(
+      'CORS_ORIGIN',
+      'http://localhost:5173',
+    );
+    res.redirect(
+      `${frontendUrl}/auth/callback?accessToken=${accessToken}&refreshToken=${refreshToken}`,
+    );
   }
 
   // ─── JWT Refresh / Profile ────────────────────────────────────────────────────
@@ -96,10 +106,16 @@ export class AuthController {
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Renovar access token con refresh token' })
-  @ApiOkResponse({ schema: { properties: { accessToken: { type: 'string' } } } })
+  @ApiOkResponse({
+    schema: { properties: { accessToken: { type: 'string' } } },
+  })
   @ApiUnauthorizedResponse({ description: 'Refresh token inválido o expirado' })
-  async refresh(@Body() dto: RefreshTokenDto): Promise<{ accessToken: string }> {
-    const accessToken = await this.authService.refreshAccessToken(dto.refreshToken);
+  async refresh(
+    @Body() dto: RefreshTokenDto,
+  ): Promise<{ accessToken: string }> {
+    const accessToken = await this.authService.refreshAccessToken(
+      dto.refreshToken,
+    );
     return { accessToken };
   }
 
@@ -108,7 +124,9 @@ export class AuthController {
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Obtener perfil del usuario autenticado' })
   @ApiOkResponse({ type: UserResponseDto })
-  @ApiUnauthorizedResponse({ description: 'Token ausente, inválido o expirado' })
+  @ApiUnauthorizedResponse({
+    description: 'Token ausente, inválido o expirado',
+  })
   me(@CurrentUser() user: User): UserResponseDto {
     return UserResponseDto.from(user);
   }
@@ -133,8 +151,12 @@ export class AuthController {
       'Requiere estar autenticado — el usuario añade biometría a su cuenta existente.',
   })
   @ApiOkResponse({ type: ChallengeResponseDto })
-  @ApiUnauthorizedResponse({ description: 'Token ausente, inválido o expirado' })
-  webAuthnRegisterBegin(@CurrentUser() user: User): Promise<ChallengeResponseDto> {
+  @ApiUnauthorizedResponse({
+    description: 'Token ausente, inválido o expirado',
+  })
+  webAuthnRegisterBegin(
+    @CurrentUser() user: User,
+  ): Promise<ChallengeResponseDto> {
     return this.authService.webAuthnRegisterBegin(user.id, user.email);
   }
 
@@ -147,7 +169,9 @@ export class AuthController {
     description:
       'Verifica la respuesta de navigator.credentials.create() y almacena la clave pública del dispositivo.',
   })
-  @ApiUnauthorizedResponse({ description: 'Challenge inválido o credencial no verificada' })
+  @ApiUnauthorizedResponse({
+    description: 'Challenge inválido o credencial no verificada',
+  })
   async webAuthnRegisterComplete(
     @CurrentUser() user: User,
     @Body() dto: WebAuthnRegisterCompleteDto,
@@ -163,7 +187,9 @@ export class AuthController {
       'Genera las opciones para llamar a navigator.credentials.get(). No requiere autenticación previa.',
   })
   @ApiOkResponse({ type: ChallengeResponseDto })
-  webAuthnLoginBegin(@Body() dto: WebAuthnLoginBeginDto): Promise<ChallengeResponseDto> {
+  webAuthnLoginBegin(
+    @Body() dto: WebAuthnLoginBeginDto,
+  ): Promise<ChallengeResponseDto> {
     return this.authService.webAuthnLoginBegin(dto.email);
   }
 
@@ -175,8 +201,12 @@ export class AuthController {
       'Verifica la firma biométrica y emite un par de JWT. Actualiza el contador anti-replay.',
   })
   @ApiOkResponse({ type: AuthResponseDto })
-  @ApiUnauthorizedResponse({ description: 'Credencial no reconocida o verificación fallida' })
-  webAuthnLoginComplete(@Body() dto: WebAuthnLoginCompleteDto): Promise<AuthResponseDto> {
+  @ApiUnauthorizedResponse({
+    description: 'Credencial no reconocida o verificación fallida',
+  })
+  webAuthnLoginComplete(
+    @Body() dto: WebAuthnLoginCompleteDto,
+  ): Promise<AuthResponseDto> {
     return this.authService.webAuthnLoginComplete(dto);
   }
 }

@@ -41,7 +41,9 @@ export class UsersController {
   @Post()
   @ApiOperation({ summary: 'Crear un usuario (admin)' })
   @ApiCreatedResponse({ type: UserResponseDto })
-  @ApiConflictResponse({ description: 'El correo electrónico ya está registrado' })
+  @ApiConflictResponse({
+    description: 'El correo electrónico ya está registrado',
+  })
   create(@Body() dto: CreateUserDto): Promise<UserResponseDto> {
     return this.usersService.create(dto);
   }
@@ -63,7 +65,8 @@ export class UsersController {
   @Patch('me')
   @ApiOperation({
     summary: 'Actualizar perfil del usuario autenticado',
-    description: 'Actualiza nombre, programa, semestre e iniciales del propio perfil.',
+    description:
+      'Actualiza nombre, programa, semestre e iniciales del propio perfil.',
   })
   @ApiOkResponse({ type: UserResponseDto })
   updateMe(
